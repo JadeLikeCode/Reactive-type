@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emotive Type</title>
+<meta name="description" content="Write something. A typeface is chosen for its tone, intent and length — and it shows its reasoning.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="band top">
+  <h1>Emotive Type</h1>
+  <p class="lede">Write or paste some copy. It reads the tone, intent and length, picks a body typeface to match, and shows its reasoning.</p>
+</header>
+
+<main>
+  <section class="band compose" aria-label="Your text">
+    <form id="form" novalidate>
+      <label for="input" class="label">Your text</label>
+      <textarea id="input" rows="7" spellcheck="true" placeholder="The morning after the storm, the street was quiet and strangely bright."></textarea>
+      <p id="error" class="error" role="alert"></p>
+      <div class="row">
+        <div class="samples" id="samples" aria-label="Try a sample"></div>
+        <div class="go">
+          <span class="hint"><kbd>Enter</kbd> to set · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span>
+          <button type="submit" class="primary" id="go">Set it</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="band result" id="result" aria-live="polite" hidden>
+    <div class="pick">
+      <p class="pick-meta"><span id="pick-class"></span> · <span id="pick-source"></span></p>
+      <h2 id="pick-name"></h2>
+      <p id="pick-note" class="note"></p>
+    </div>
+    <div class="specimen-tools">
+      <label class="toggle"><input type="checkbox" id="marks" checked> Mark the words it reacted to</label>
+    </div>
+    <article id="specimen" class="specimen show-marks"></article>
+
+  </section>
+
+  <section class="band how" id="how" hidden aria-labelledby="how-title">
+    <h2 id="how-title">How it chose</h2>
+    <ol class="steps">
+      <li class="step">
+        <h3>1. Read</h3>
+        <p class="step-sub">What kind of writing this is</p>
+        <dl id="read" class="stats"></dl>
+      </li>
+      <li class="step">
+        <h3>2. Feel</h3>
+        <p class="step-sub" id="feel-sub">The emotional register</p>
+        <div id="feel" class="bars"></div>
+      </li>
+      <li class="step">
+        <h3>3. Match</h3>
+        <p class="step-sub">Why this typeface answers it</p>
+        <div id="match" class="match"></div>
+      </li>
+      <li class="step">
+        <h3>4. Set</h3>
+        <p class="step-sub">Size, leading and line length</p>
+        <dl id="set" class="stats"></dl>
+      </li>
+    </ol>
+    <details class="all" id="all" hidden>
+      <summary>All typefaces, ranked</summary>
+      <ol id="ranking" class="ranking"></ol>
+    </details>
+    <p class="method" id="method"></p>
+  </section>
+</main>
+
+<footer class="band foot">
+  <p>Typefaces from Google Fonts, all under the SIL Open Font License.</p>
+</footer>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

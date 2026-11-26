@@ -1,0 +1,13 @@
+name = "emotive-type"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Which Claude model reads the text. claude-haiku-5-5 is faster and cheaper.
+MODEL = "claude-sonnet-5-5"
+# Comma-separated origins allowed to call this worker, e.g.
+# "https://yourname.github.io,http://localhost:8000". "*" allows any site.
+ALLOWED_ORIGINS = "*"
+
+# The API key is a secret, not a var. Set it with:
+#   npx wrangler secret put ANTHROPIC_API_KEY

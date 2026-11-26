@@ -1,0 +1,406 @@
+[
+ {
+  "name": "Literata",
+  "cls": "Book serif",
+  "note": "Built for long reading on screens; calm and slightly warm."
+ },
+ {
+  "name": "Source Serif 4",
+  "cls": "Editorial serif",
+  "note": "Neutral transitional serif; credible and unfussy."
+ },
+ {
+  "name": "Newsreader",
+  "cls": "News serif",
+  "note": "Made for news reading; serious without being stiff."
+ },
+ {
+  "name": "EB Garamond",
+  "cls": "Old-style serif",
+  "note": "16th-century Garamond revival; classical, lyrical."
+ },
+ {
+  "name": "Crimson Pro",
+  "cls": "Literary serif",
+  "note": "Book typography in the Garamond tradition, more contemporary."
+ },
+ {
+  "name": "Lora",
+  "cls": "Calligraphic serif",
+  "note": "Brushed curves; reads like a letter set in type."
+ },
+ {
+  "name": "Fraunces",
+  "cls": "Soft wonky serif",
+  "note": "Old-style wonk with a softness axis; warm and characterful.",
+  "fvs": "'SOFT' 100",
+  "q": "Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..700,0..100"
+ },
+ {
+  "name": "Spectral",
+  "cls": "Screen serif",
+  "note": "Light, elegant and cool."
+ },
+ {
+  "name": "Libre Baskerville",
+  "cls": "Transitional serif",
+  "note": "Baskerville made sturdy for screens; institutional, composed."
+ },
+ {
+  "name": "Libre Caslon Text",
+  "cls": "Colonial serif",
+  "note": "Caslon for body text; historical, American, trustworthy."
+ },
+ {
+  "name": "Alegreya",
+  "cls": "Humanist serif",
+  "note": "Calligraphic rhythm made for literature; tales and fables."
+ },
+ {
+  "name": "Cormorant Garamond",
+  "cls": "Display Garamond",
+  "note": "High contrast, fine detail; beautiful large, fragile small."
+ },
+ {
+  "name": "Merriweather",
+  "cls": "Sturdy text serif",
+  "note": "Large x-height, robust serifs; dependable anywhere."
+ },
+ {
+  "name": "PT Serif",
+  "cls": "Public serif",
+  "note": "Russian public-type project serif; plain, sober, civic."
+ },
+ {
+  "name": "Gelasio",
+  "cls": "Georgia-like serif",
+  "note": "Metric-compatible with Georgia; familiar, warm, web-native."
+ },
+ {
+  "name": "Petrona",
+  "cls": "Slab-leaning serif",
+  "note": "Lively, slightly rough serif; personal and literary."
+ },
+ {
+  "name": "Besley",
+  "cls": "Clarendon serif",
+  "note": "Victorian Clarendon; confident, bookish, a little stately."
+ },
+ {
+  "name": "Brygada 1918",
+  "cls": "Polish book serif",
+  "note": "Revival of a 1918 Polish face; dignified and European."
+ },
+ {
+  "name": "Young Serif",
+  "cls": "Heavy old-style",
+  "note": "Chunky, friendly old-style; feels like a cookbook or indie press."
+ },
+ {
+  "name": "Bodoni Moda",
+  "cls": "Didone",
+  "note": "High-contrast fashion serif; glamorous, cold, editorial."
+ },
+ {
+  "name": "DM Serif Text",
+  "cls": "Low-contrast didone",
+  "note": "Text-weight didone; polished, magazine-like."
+ },
+ {
+  "name": "Domine",
+  "cls": "Sturdy text serif",
+  "note": "Built for body text; strong and practical."
+ },
+ {
+  "name": "Vollkorn",
+  "cls": "Dark old-style",
+  "note": "\"Wholegrain\" serif; hearty, dark, bookish."
+ },
+ {
+  "name": "Cardo",
+  "cls": "Scholarly serif",
+  "note": "For classicists and medievalists; old, quiet, scholarly."
+ },
+ {
+  "name": "Sorts Mill Goudy",
+  "cls": "Goudy revival",
+  "note": "Goudy Oldstyle; Arts and Crafts warmth."
+ },
+ {
+  "name": "Old Standard TT",
+  "cls": "Modern serif",
+  "note": "19th-century scientific book type; formal and antique."
+ },
+ {
+  "name": "IM Fell English",
+  "cls": "Antique print",
+  "note": "17th-century Fell types; rough, archival, folkloric."
+ },
+ {
+  "name": "Castoro",
+  "cls": "Dutch old-style",
+  "note": "Contemporary Dutch serif; sturdy, plain-spoken literary."
+ },
+ {
+  "name": "Piazzolla",
+  "cls": "Compact serif",
+  "note": "Sharp, dense, economical; good for argument and essays."
+ },
+ {
+  "name": "Faustina",
+  "cls": "Compact serif",
+  "note": "Space-saving serif with personality; news and books."
+ },
+ {
+  "name": "Roboto Serif",
+  "cls": "Interface serif",
+  "note": "Designed for UI reading; neutral, technical."
+ },
+ {
+  "name": "IBM Plex Serif",
+  "cls": "Engineered serif",
+  "note": "Corporate rigor with a human edge."
+ },
+ {
+  "name": "Playfair Display",
+  "cls": "High-contrast display",
+  "note": "Transitional display serif; elegant, a bit dramatic."
+ },
+ {
+  "name": "Bitter",
+  "cls": "Text slab",
+  "note": "Slab built for screens; friendly, firm."
+ },
+ {
+  "name": "Zilla Slab",
+  "cls": "Slab serif",
+  "note": "Contemporary slab; plain-spoken with swagger."
+ },
+ {
+  "name": "Roboto Slab",
+  "cls": "Mechanical slab",
+  "note": "Geometric slab; sturdy and utilitarian."
+ },
+ {
+  "name": "Arvo",
+  "cls": "Geometric slab",
+  "note": "Round geometric slab; retro and robust."
+ },
+ {
+  "name": "Courier Prime",
+  "cls": "Typewriter",
+  "note": "Screenplay typewriter; a document someone left behind."
+ },
+ {
+  "name": "Special Elite",
+  "cls": "Worn typewriter",
+  "note": "Battered typewriter; noir, case files, ransom notes."
+ },
+ {
+  "name": "Cutive Mono",
+  "cls": "Light typewriter",
+  "note": "Thin IBM-style typewriter; clinical, archival."
+ },
+ {
+  "name": "IBM Plex Mono",
+  "cls": "Monospace",
+  "note": "Engineered monospace; code, logs, precision."
+ },
+ {
+  "name": "JetBrains Mono",
+  "cls": "Code mono",
+  "note": "Programmer's mono; tall and clear."
+ },
+ {
+  "name": "Space Mono",
+  "cls": "Retro mono",
+  "note": "Geometric 1960s-flavored mono; techy and editorial."
+ },
+ {
+  "name": "DM Mono",
+  "cls": "Soft mono",
+  "note": "Low-contrast friendly mono."
+ },
+ {
+  "name": "Atkinson Hyperlegible",
+  "cls": "Legibility sans",
+  "note": "Braille Institute design; every letter distinct."
+ },
+ {
+  "name": "IBM Plex Sans",
+  "cls": "Engineered grotesque",
+  "note": "Precise, orderly, corporate."
+ },
+ {
+  "name": "Work Sans",
+  "cls": "Grotesque",
+  "note": "Friendly early-grotesque; open and unpretentious."
+ },
+ {
+  "name": "Nunito",
+  "cls": "Rounded sans",
+  "note": "Rounded terminals soften everything."
+ },
+ {
+  "name": "Space Grotesk",
+  "cls": "Quirky grotesque",
+  "note": "Derived from a mono; techy, idiosyncratic."
+ },
+ {
+  "name": "Archivo",
+  "cls": "Industrial grotesque",
+  "note": "Grotesque for headlines and data; forceful."
+ },
+ {
+  "name": "Recursive",
+  "cls": "Casual sans",
+  "note": "Brush-written casual axis; chatty and loose.",
+  "fvs": "'CASL' 1",
+  "q": "Recursive:slnt,wght,CASL@-15..0,400..700,0..1"
+ },
+ {
+  "name": "Manrope",
+  "cls": "Modern grotesque",
+  "note": "Semi-condensed, clean, contemporary tech."
+ },
+ {
+  "name": "DM Sans",
+  "cls": "Geometric sans",
+  "note": "Low-contrast geometric; tidy startup voice."
+ },
+ {
+  "name": "Figtree",
+  "cls": "Friendly geometric",
+  "note": "Clean, friendly, highly readable."
+ },
+ {
+  "name": "Plus Jakarta Sans",
+  "cls": "Modern geometric",
+  "note": "Sharp, modern, confident; product and brand."
+ },
+ {
+  "name": "Public Sans",
+  "cls": "Government sans",
+  "note": "USWDS neutral sans; civic, strong, plain."
+ },
+ {
+  "name": "Libre Franklin",
+  "cls": "American gothic",
+  "note": "Franklin Gothic interpretation; newsy, direct, assertive."
+ },
+ {
+  "name": "Hanken Grotesk",
+  "cls": "Swiss grotesque",
+  "note": "Clean grotesque; contemporary editorial."
+ },
+ {
+  "name": "Schibsted Grotesk",
+  "cls": "News grotesque",
+  "note": "Made for a news group; punchy and clear."
+ },
+ {
+  "name": "Familjen Grotesk",
+  "cls": "Expressive grotesque",
+  "note": "Grotesque with quirky details; editorial character."
+ },
+ {
+  "name": "Onest",
+  "cls": "Neutral grotesque",
+  "note": "Modern, neutral, a touch warm."
+ },
+ {
+  "name": "Outfit",
+  "cls": "Geometric sans",
+  "note": "Geometric, branded, airy."
+ },
+ {
+  "name": "Sora",
+  "cls": "Tech geometric",
+  "note": "Wide, techy, crypto-and-product flavored."
+ },
+ {
+  "name": "Lexend",
+  "cls": "Reading-proficiency sans",
+  "note": "Designed to reduce visual stress when reading."
+ },
+ {
+  "name": "Albert Sans",
+  "cls": "Scandinavian geometric",
+  "note": "Geometric with Nordic restraint."
+ },
+ {
+  "name": "Red Hat Text",
+  "cls": "Corporate humanist",
+  "note": "Open-source corporate voice; approachable."
+ },
+ {
+  "name": "Source Sans 3",
+  "cls": "Humanist sans",
+  "note": "Adobe's first open sans; neutral and clear."
+ },
+ {
+  "name": "Fira Sans",
+  "cls": "Humanist sans",
+  "note": "Mozilla's humanist; legible, slightly technical."
+ },
+ {
+  "name": "Karla",
+  "cls": "Grotesque",
+  "note": "Quirky grotesque; casual and indie."
+ },
+ {
+  "name": "Rubik",
+  "cls": "Rounded geometric",
+  "note": "Slightly rounded corners; playful but solid."
+ },
+ {
+  "name": "Mulish",
+  "cls": "Minimal sans",
+  "note": "Minimalist; light and clean."
+ },
+ {
+  "name": "Raleway",
+  "cls": "Elegant sans",
+  "note": "Elegant thin-leaning sans; fashion and lifestyle."
+ },
+ {
+  "name": "Josefin Sans",
+  "cls": "Vintage geometric",
+  "note": "1920s geometric; elegant and nostalgic."
+ },
+ {
+  "name": "Bricolage Grotesque",
+  "cls": "Quirky grotesque",
+  "note": "Ink-trapped grotesque; editorial and characterful."
+ },
+ {
+  "name": "Syne",
+  "cls": "Art-world grotesque",
+  "note": "Made for an art center; avant-garde and odd."
+ },
+ {
+  "name": "Unbounded",
+  "cls": "Wide display sans",
+  "note": "Very wide and round; loud, Web3, festival."
+ },
+ {
+  "name": "Big Shoulders Text",
+  "cls": "Condensed gothic",
+  "note": "Chicago-inspired condensed; urban, civic, loud."
+ },
+ {
+  "name": "Barlow",
+  "cls": "Californian grotesque",
+  "note": "Slightly rounded, low-contrast; road signs and transit."
+ },
+ {
+  "name": "Caveat",
+  "cls": "Handwriting",
+  "note": "Casual handwriting; notes and postcards."
+ },
+ {
+  "name": "Patrick Hand",
+  "cls": "Print handwriting",
+  "note": "Neat hand-printed letters; personal, informal."
+ }
+]

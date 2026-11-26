@@ -1,0 +1,88 @@
+/*
+VOICE   quiet proofing room: the tool stays out of the way so the chosen face is the event
+IDEA    a type proof sheet with a proofreader's red pencil marking what it noticed
+PICTURE the user's own words, set large in the chosen typeface
+COLOUR  white paper, warm black ink, one proof-red accent
+TYPE    system UI for the chrome so it never competes; the specimen carries all the character
+LAYOUT  composer, then the specimen as the hero, then four reasoning steps in a row
+*/
+:root{color-scheme:light dark;
+  --bg:light-dark(#ffffff,#121110);--ink:light-dark(#1b1a18,#ecebe7);
+  --sub:light-dark(#5e5b55,#a8a49c);--line:light-dark(#e6e3dd,#2c2a27);
+  --wash:light-dark(#f6f4f0,#1b1a18);--red:light-dark(#d1321f,#ff7a66);
+  --red-wash:light-dark(#fbe7e3,#3a1c17)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3.5vw,48px) max(5vw,16px);max-width:1240px;margin:0 auto}
+h1{font-size:clamp(28px,4vw,40px);line-height:1.05;margin:0 0 8px;font-weight:650;letter-spacing:-.01em}
+h2{font-size:22px;line-height:1.2;margin:0;font-weight:600}
+h3{font-size:16px;margin:0;font-weight:600}
+.top{padding-bottom:8px}
+.lede{margin:0;color:var(--sub);max-width:60ch}
+.label{display:block;font-size:13px;color:var(--sub);margin:0 0 6px}
+
+textarea{width:100%;font-family:inherit;font-size:17px;line-height:1.55;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;resize:vertical;min-height:150px}
+textarea:focus,button:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.error{color:var(--red);font-size:14px;margin:6px 0 0;min-height:1em}
+.row{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin-top:8px}
+.samples{display:flex;flex-wrap:wrap;gap:6px}
+.samples button{font-family:inherit;font-size:14px;color:var(--ink);background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:0 14px;min-height:36px;cursor:pointer}
+.samples button:hover{border-color:var(--sub)}
+.go{display:flex;align-items:center;gap:12px;margin-left:auto}
+.hint{font-size:13px;color:var(--sub)}
+kbd{font:12px ui-monospace,monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px}
+.primary{font-family:inherit;font-size:15px;font-weight:600;color:var(--bg);background:var(--ink);border:0;border-radius:10px;padding:0 20px;min-height:44px;cursor:pointer}
+.primary:hover{opacity:.88}
+
+.result{border-top:1px solid var(--line)}
+.pick-meta{margin:0 0 4px;font-size:13px;color:var(--sub)}
+#pick-match{color:var(--red);font-weight:600}
+#pick-name{font-size:clamp(30px,5vw,48px);line-height:1.05;font-weight:400}
+.note{margin:6px 0 0;color:var(--sub);max-width:62ch}
+.specimen-tools{margin:20px 0 8px}
+.toggle{font-size:14px;color:var(--sub);display:inline-flex;gap:8px;align-items:center;cursor:pointer;min-height:44px}
+.toggle input{width:18px;height:18px;accent-color:var(--red)}
+.specimen{background:var(--wash);border-radius:14px;padding:clamp(22px,4vw,56px);min-height:220px;transition:opacity .35s ease}
+.specimen.loading{opacity:.25}
+.specimen p{margin:0 auto 1em;max-width:var(--measure,62ch)}
+.specimen p:last-child{margin-bottom:0}
+.specimen mark{background:none;color:inherit;text-decoration:underline 2px var(--red);text-underline-offset:.18em}
+.specimen:not(.show-marks) mark{text-decoration:none}
+
+
+
+.how{border-top:1px solid var(--line)}
+.steps{list-style:none;padding:0;margin:18px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.step{border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.step-sub{margin:2px 0 12px;font-size:13px;color:var(--sub)}
+.stats{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:14px}
+.stats dt{color:var(--sub)}.stats dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:86px 1fr 32px;gap:8px;align-items:center;font-size:13px}
+.bar-track{display:block;height:8px;background:var(--wash);border-radius:4px;overflow:hidden}
+.bar-fill{display:block;height:100%;background:var(--ink);border-radius:4px;transition:width .5s ease}
+.bar.hot .bar-fill{background:var(--red)}
+.bar-val{text-align:right;color:var(--sub);font-variant-numeric:tabular-nums}
+.words{grid-column:2/4;font-size:12px;color:var(--sub);margin-top:-3px}
+.match p{margin:0 0 10px;font-size:14px}
+.cmp{display:grid;gap:6px;margin:0 0 12px}
+.cmp-row{font-size:13px}
+.cmp-row b{font-weight:600}
+.cmp-dots{display:flex;gap:10px;color:var(--sub);font-variant-numeric:tabular-nums}
+.evidence{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:6px;font-size:13px;color:var(--sub)}
+.evidence q{color:var(--ink);quotes:"\201C" "\201D";text-decoration:underline 2px var(--red);text-underline-offset:.18em}
+.also{font-size:13px;color:var(--sub);margin:14px 0 6px!important}
+.alts-list{list-style:none;padding:0;margin:0;display:grid;gap:8px;font-size:14px}
+.alts-list b{font-weight:600}
+.set-why{grid-column:1/3;margin-top:6px}
+.all{margin-top:16px}
+summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:14px;color:var(--sub)}
+.ranking{columns:2 240px;font-size:14px;margin:4px 0 0;padding-left:22px}
+.ranking li{break-inside:avoid;padding:2px 0}
+.ranking span{color:var(--sub);font-variant-numeric:tabular-nums}
+.method{font-size:13px;color:var(--sub);max-width:70ch;margin:16px 0 0}
+.foot{font-size:13px;color:var(--sub)}
+
+@media(max-width:600px){.go{margin-left:0;width:100%;justify-content:space-between}.hint{display:none}.primary{flex:1}}
+@media(prefers-reduced-motion:reduce){.specimen,.bar-fill{transition:none}}
