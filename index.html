@@ -23,16 +23,12 @@
 </header>
 
 <main class="stage">
-  <section class="write" id="write-view">
+  <div class="surface" id="surface">
+    <div class="mirror" id="mirror" aria-hidden="true"></div>
     <label for="input" class="sr-only">Write something</label>
     <textarea id="input" rows="1" spellcheck="false" placeholder="Start typing. The type is listening."></textarea>
-  </section>
-
-  <section class="read" id="read-view" hidden aria-labelledby="read-title">
-    <h2 id="read-title" class="sr-only">Reading</h2>
-    <article id="specimen" class="specimen" tabindex="0" title="Click to keep writing"></article>
-    <aside class="notes" id="notes"></aside>
-  </section>
+  </div>
+  <aside class="notes" id="notes" aria-live="polite" aria-label="Reading"></aside>
 </main>
 
 <aside class="meters" id="meters" aria-label="Tone, live"></aside>

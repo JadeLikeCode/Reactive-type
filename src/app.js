@@ -163,11 +163,11 @@ async function swapFace(f, set) {
 
 // ---------------------------------------------------------------- the considered reading
 async function settle() {
-  const text = input.value.trim();
+  const text = input.value;
   if ((text.match(/[A-Za-z']+/g) || []).length < 3) { status('write a sentence first'); return; }
   const a = analyze(text);
   setMode('reading');
-  showSpecimen(text, [], null);
+  input.readOnly = true;
   status(WORKER_URL ? 'claude is reading…' : 'reading…');
   let v = null, note = '';
   if (WORKER_URL) {
@@ -176,15 +176,19 @@ async function settle() {
   }
   if (!v) v = fromRules(a, note);
   await loadFont(v.font);
+  input.readOnly = false;
+  if (input.value !== text) return; // they kept typing; stay live
+  swapId++; // cancel any pending live swap
+  input.classList.remove('swap');
   current = v.font;
   applyFace(v.font, v.setting);
-  root.setProperty('--size', `${v.setting.size * (a.lengthClass === 'short' ? 1.5 : 1.15)}px`);
-  root.setProperty('--lead', v.setting.leading);
-  root.setProperty('--measure', `${v.setting.measure}ch`);
+  grow();
   applyField(v.tone);
   renderMeters(v.tone, hotOf(v.tone));
-  showSpecimen(text, v.evidence, v);
-  setMode('read');
+  const ev = v.source === 'rules' ? v.evidence.slice(0, 6) : v.evidence;
+  renderMirror(text, ev);
+  renderNotes(v, ev);
+  setMode('set');
   status(`read by ${v.source === 'ai' ? 'claude' : 'rules'} · ${v.intent}`);
 }
 
@@ -229,71 +233,57 @@ function fromRules(a, note) {
   };
 }
 
-function markText(text, phrases) {
+// The mirror sits exactly under the textarea, with the same metrics and
+// transparent text, so marks line up with the words without duplicating them.
+function renderMirror(text, phrases) {
   const list = [...new Set(phrases.map((p) => p.phrase).filter(Boolean))].sort((x, y) => y.length - x.length);
   const index = new Map();
   phrases.forEach((p) => { if (!index.has(lower(p.phrase))) index.set(lower(p.phrase), index.size + 1); });
-  const re = list.length ? new RegExp(`(?<![A-Za-z])(${list.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![A-Za-z])`, 'gi') : null;
-  const seen = new Set();
-  const line = (l) => {
-    if (!re) return esc(l);
-    let out = '', last = 0;
-    for (const m of l.matchAll(re)) {
+  let html = '';
+  if (list.length) {
+    const re = new RegExp(`(?<![A-Za-z])(${list.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![A-Za-z])`, 'gi');
+    const seen = new Set();
+    let last = 0;
+    for (const m of text.matchAll(re)) {
       const n = index.get(lower(m[0]));
       const first = !seen.has(n); seen.add(n);
-      out += esc(l.slice(last, m.index)) + `<mark>${esc(m[0])}</mark>${first ? `<sup>${n}</sup>` : ''}`;
+      html += esc(text.slice(last, m.index)) + `<mark${first ? ` data-n="${n}"` : ''}>${esc(m[0])}</mark>`;
       last = m.index + m[0].length;
     }
-    return out + esc(l.slice(last));
-  };
-  return text.split(/\n{2,}/).map((p) => '<p>' + p.split('\n').map(line).join('<br>') + '</p>').join('');
+    html += esc(text.slice(last));
+  } else html = esc(text);
+  $('mirror').innerHTML = html + ' ';
 }
 
-function showSpecimen(text, evidence, v) {
-  // In rules mode the word list can be long; number only the first few.
-  const ev = v?.source === 'rules' ? evidence.slice(0, 6) : evidence;
-  $('specimen').innerHTML = markText(text, ev);
-  if (!v) { $('notes').innerHTML = ''; return; }
+function renderNotes(v, ev) {
   const s = v.setting;
   $('notes').innerHTML = `
     <section><h3>face</h3><p class="face">${esc(v.font.name)}</p><p class="r">${esc(lower(v.font.cls))} · ${esc(v.font.note)}</p></section>
     <section><h3>reads as</h3><p>${esc(v.intent)}${v.voice ? ` <span class="r">· ${esc(v.voice)}</span>` : ''}</p></section>
-    ${ev.length ? `<section><h3>signals</h3><ol>${ev.map((e) => `<li><span><q>${esc(e.phrase)}</q> <span class="r">→ ${esc(lower(e.reading))}</span></span></li>`).join('')}</ol></section>` : ''}
+    ${ev.length ? `<section><h3>signals</h3><ol>${ev.map((e, i) => `<li><b>${i + 1}</b><span><q>${esc(e.phrase)}</q> <span class="r">→ ${esc(lower(e.reading))}</span></span></li>`).join('')}</ol></section>` : ''}
     <section><h3>why</h3>${v.reasoning.map((p) => `<p>${esc(p)}</p>`).join('')}</section>
     ${v.alternates.length ? `<section><h3>also considered</h3><ul>${v.alternates.map((x) => `<li>${esc(x.name)} <span class="r">— ${esc(x.why)}</span></li>`).join('')}</ul></section>` : ''}
-    <section><h3>set</h3><dl><dt>size</dt><dd>${s.size}px</dd><dt>leading</dt><dd>${s.leading}</dd><dt>measure</dt><dd>${s.measure}ch</dd><dt>weight</dt><dd>${s.weight}</dd></dl><p class="r" style="margin-top:6px">${esc(lower(s.why))}</p></section>
-    <section><p class="r">${v.source === 'ai' ? `claude${v.model ? ` (${esc(v.model)})` : ''} chose from ${POOL.length} typefaces.` : `offline rules · 20 hand-scored faces.`}</p></section>`;
+    <section><h3>suggested setting</h3><dl><dt>size</dt><dd>${s.size}px</dd><dt>leading</dt><dd>${s.leading}</dd><dt>measure</dt><dd>${s.measure}ch</dd><dt>weight</dt><dd>${s.weight}</dd></dl><p class="r" style="margin-top:6px">${esc(lower(s.why))}</p></section>
+    <section><p class="r">${v.source === 'ai' ? `claude${v.model ? ` (${esc(v.model)})` : ''} chose from ${POOL.length} typefaces.` : 'offline rules · 20 hand-scored faces.'}</p></section>`;
 }
 
 // ---------------------------------------------------------------- modes, keys, status
 function status(t) { $('status').textContent = `> ${t}`; }
 function setMode(m) {
   body.dataset.mode = m;
-  const writing = m === 'write';
-  $('write-view').hidden = !writing;
-  $('read-view').hidden = writing;
   const enter = '<kbd>enter</kbd>';
-  $('keys').innerHTML = writing
-    ? `${enter} read deeply · <kbd>shift</kbd>+${enter} new line`
-    : m === 'reading' ? 'reading…' : `<kbd>esc</kbd> keep writing · <button type="button" id="edit">edit</button>`;
-  $('edit')?.addEventListener('click', backToWriting);
-}
-function backToWriting() {
-  setMode('write');
-  live();
-  input.focus();
-  input.setSelectionRange(input.value.length, input.value.length);
+  $('keys').innerHTML = m === 'write' ? `${enter} set it · <kbd>shift</kbd>+${enter} new line`
+    : m === 'reading' ? 'reading…' : `keep typing to edit · ${enter} read again`;
 }
 
-input.addEventListener('input', () => { clearTimeout(liveTimer); liveTimer = setTimeout(live, 140); grow(); });
+input.addEventListener('input', () => {
+  if (body.dataset.mode === 'set') setMode('write'); // editing in place: marks fade, notes tuck away
+  clearTimeout(liveTimer); liveTimer = setTimeout(live, 140); grow();
+});
 input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); settle(); }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (body.dataset.mode !== 'reading') settle(); }
 });
-document.addEventListener('keydown', (e) => {
-  if (body.dataset.mode !== 'read') return;
-  if (e.key === 'Escape' || (e.key.length === 1 && !e.metaKey && !e.ctrlKey)) backToWriting();
-});
-$('specimen').addEventListener('click', backToWriting);
+window.addEventListener('resize', grow);
 
 // Warm the offline faces so live swaps are instant.
 const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));

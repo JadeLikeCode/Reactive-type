@@ -57,48 +57,50 @@ kbd{font:inherit;border:1px solid var(--line);border-radius:3px;padding:0 5px;co
 .meter.hot{color:var(--ink)}
 .meter .v{text-align:right}
 
-/* ---- stage */
-.stage{position:relative;z-index:1;min-height:100vh;display:grid;place-items:center;padding:96px max(5vw,16px) 120px calc(max(3vw,16px) + 30ch)}
-.write,.read{width:100%;max-width:1100px}
-textarea{display:block;width:100%;max-width:var(--measure);margin:0 auto;background:transparent;border:0;outline:0;resize:none;overflow:hidden;
-  color:var(--ink);caret-color:var(--accent);font-family:var(--face);font-size:var(--size);line-height:var(--lead);font-weight:var(--weight);
-  font-variation-settings:var(--fvs);transition:font-size var(--t),max-width var(--t),opacity .18s,font-weight .6s,letter-spacing var(--t);min-height:1.3em}
+/* ---- stage: one writing surface; notes appear beside it without moving it */
+[hidden]{display:none!important}
+.stage{position:relative;z-index:1;min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,34ch);gap:clamp(24px,4vw,64px);
+  align-items:center;padding:96px max(3vw,16px) 120px calc(max(3vw,16px) + 30ch)}
+.surface{position:relative;width:100%;font-size:var(--size);max-width:var(--measure);justify-self:center;transition:max-width var(--t)}
+.mirror,textarea{font-family:var(--face);font-size:var(--size);line-height:var(--lead);font-weight:var(--weight);font-variation-settings:var(--fvs);
+  letter-spacing:normal;padding:0;margin:0;border:0;white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word;
+  transition:font-size var(--t),opacity .18s,font-weight .6s}
+.mirror{position:absolute;inset:0;color:transparent;pointer-events:none;opacity:0;transition:opacity .5s,font-size var(--t)}
+.mirror mark{background:none;color:transparent;position:relative;text-decoration:underline 1px var(--accent);text-underline-offset:.2em;text-decoration-skip-ink:none}
+.mirror mark::after{content:attr(data-n);position:absolute;right:-.85em;top:-.15em;font:11px/1 var(--mono);color:var(--accent)}
+body[data-mode=set] .mirror{opacity:1}
+textarea{position:relative;display:block;width:100%;background:transparent;outline:0;resize:none;overflow:hidden;color:var(--ink);caret-color:var(--accent);min-height:1.3em}
 textarea::placeholder{color:var(--dim);font-family:var(--mono)}
 textarea.swap{opacity:.15}
-textarea:focus-visible{outline:none}
+body[data-mode=reading] textarea{animation:breathe 1.6s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.45}}
 
-/* ---- read view */
-.read{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,34ch);gap:clamp(24px,4vw,64px);align-items:start}
-.specimen{font-family:var(--face);font-size:var(--size);line-height:var(--lead);font-weight:var(--weight);font-variation-settings:var(--fvs);
-  max-width:var(--measure);cursor:text;outline:0;animation:rise .7s cubic-bezier(.2,.7,.2,1)}
-.specimen p{margin:0 0 .8em}.specimen p:last-child{margin:0}
-.specimen mark{background:none;color:inherit;text-decoration:underline 1px color-mix(in srgb,var(--accent) 80%,transparent);text-underline-offset:.2em}
-.specimen sup{font:11px var(--mono);color:var(--accent);margin-left:2px;vertical-align:super}
-.notes{font-size:13px;line-height:1.55;display:grid;gap:18px;border-left:1px solid var(--line);padding-left:20px;animation:rise .7s .15s cubic-bezier(.2,.7,.2,1) both}
+/* ---- notes */
+.notes{font-size:13px;line-height:1.55;display:grid;gap:18px;border-left:1px solid var(--line);padding-left:20px;align-self:center;
+  opacity:0;visibility:hidden;transform:translateX(8px);transition:opacity .5s,transform .5s,visibility 0s .5s}
+body[data-mode=set] .notes{opacity:1;visibility:visible;transform:none;transition:opacity .6s .1s,transform .6s .1s}
 .notes h3{font:inherit;color:var(--dim);margin:0 0 6px}
 .notes h3::before{content:"> "}
 .notes p,.notes ol,.notes ul,.notes dl{margin:0}
-.notes ol{padding-left:0;list-style:none;display:grid;gap:6px;counter-reset:n}
-.notes ol li{counter-increment:n;display:grid;grid-template-columns:3ch 1fr}
-.notes ol li::before{content:counter(n);color:var(--accent)}
+.notes ol{padding-left:0;list-style:none;display:grid;gap:6px}
+.notes ol li{display:grid;grid-template-columns:3ch 1fr}
+.notes ol li b{font-weight:400;color:var(--accent)}
 .notes q{color:var(--ink)}
 .notes .r{color:var(--dim)}
 .notes ul{padding-left:0;list-style:none;display:grid;gap:6px}
 .notes dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px}
 .notes dt{color:var(--dim)}.notes dd{margin:0;text-align:right}
 .notes .face{font-family:var(--face);font-variation-settings:var(--fvs);font-size:28px;line-height:1.1;color:var(--ink)}
-@keyframes rise{from{opacity:0;transform:translateY(12px)}}
-body[data-mode=reading] .specimen{animation:breathe 1.6s ease-in-out infinite}
-@keyframes breathe{50%{opacity:.45}}
 
 @media(max-width:900px){
   .stage{padding:88px max(5vw,16px) 140px}
   .meters{position:static;transform:none;margin:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 14px;font-size:11px;
     position:fixed;left:0;right:0;top:auto;bottom:44px;padding:0 max(5vw,16px)}
   .meter{grid-template-columns:auto 1fr}.meter .bar{display:none}
-  .read{grid-template-columns:minmax(0,1fr)}
-  .notes{border-left:0;border-top:1px solid var(--line);padding:16px 0 0}
+  .stage{grid-template-columns:minmax(0,1fr);align-content:center}
+  .notes{border-left:0;border-top:1px solid var(--line);padding:16px 0 0;align-self:start}
+  body:not([data-mode=set]) .notes{display:none}
   .readout{max-width:55vw}
 }
 @media(max-width:600px){.keys{display:none}.meters{display:none}}
-@media(prefers-reduced-motion:reduce){.glow,.blink,.specimen,.notes{animation:none!important}textarea{transition:none}}
+@media(prefers-reduced-motion:reduce){.glow,.blink,textarea{animation:none!important}textarea,.mirror,.notes{transition:none}}
