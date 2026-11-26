@@ -24,7 +24,8 @@ const words = {
     cheer cheerful dance sunny playful silly giggle wow win winner bright beautiful best surprise lol haha`,
   melancholy: `sad sadness sorrow grief grieve mourn loss lost lonely alone empty miss missing tears tear
     cry cried weep ache longing gone goodbye farewell regret remember memory memories faded fade quiet
-    gray grey rain autumn winter ash hollow broken heartbreak heartbroken`,
+    gray grey rain autumn winter ash hollow broken heartbreak heartbroken anymore tired exhausted
+    leaving numb hurt hurts pain devastated disappointed disappointing heavy`,
   intensity: `angry anger rage furious fury hate hated scream shout yell fight fighting war attack
     destroy burn burning fire explode explosion urgent immediately demand enough stop furious promised betray betrayed liar
     power powerful force fast faster crash smash break bold fierce wild loud`,

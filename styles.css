@@ -57,6 +57,7 @@ kbd{font:inherit;border:1px solid var(--line);border-radius:3px;padding:0 5px;co
 .meter.lean span:first-child{color:var(--accent)}
 .meter.lean span:first-child::after{content:" ←";animation:blink 1s steps(1) infinite}
 .meter .v{text-align:right}
+.meter.mood{grid-template-columns:13ch auto 6ch;margin-bottom:8px}
 
 /* ---- stage: one writing surface; notes appear beside it without moving it */
 [hidden]{display:none!important}

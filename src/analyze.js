@@ -2,6 +2,90 @@
 // a length class, and the evidence behind each — so the UI can explain itself.
 
 import { DIMENSIONS, LEXICON, NEGATORS, INFORMAL, MARKETING, IMPERATIVE_STARTS } from './lexicon.js';
+import { VALENCE } from './valence.js';
+
+// Words that turn a message around: what came before counts for less.
+const TURNS = new Set(['but', 'however', 'nevermind', 'although', 'though', 'yet', 'except', 'instead', 'actually', 'jk']);
+// Family words say who a message is for, not how it feels: half weight.
+const KIN = new Set(['mother', 'mom', 'mum', 'father', 'dad', 'family', 'grandma', 'grandmother', 'grandpa', 'baby', 'friend']);
+
+function valenceOf(w) {
+  if (w in VALENCE) return VALENCE[w];
+  const s = stem(w);
+  if (s in VALENCE) return VALENCE[s];
+  if (s + 'e' in VALENCE) return VALENCE[s + 'e'];
+  return 0;
+}
+// Contempt and hostility read as intensity; other negative words read as hurt.
+const HOSTILE = new Set(['disgusting', 'pathetic', 'horrible', 'hate', 'stupid', 'idiot', 'idiotic', 'ugly', 'worst', 'ridiculous',
+  'outrageous', 'gross', 'trash', 'garbage', 'damn', 'hell', 'shit', 'fuck', 'fucking', 'bullshit', 'crap', 'screw', 'ruined', 'ruin',
+  'useless', 'liar', 'cruel', 'despise', 'loathe', 'sucks', 'awful', 'terrible', 'nasty', 'jerk', 'dumb', 'insulting', 'shameful']);
+// Phrases whose words say the opposite of what they mean.
+const PHRASES = [
+  [/\bthanks? for nothing\b/g, 'intensity'], [/\byeah,? right\b/g, 'intensity'], [/\bwhatever\b/g, 'intensity'],
+  [/\b(can'?t|cannot) (do|take) (this|it) any ?more\b/g, 'melancholy'], [/\bi give up\b/g, 'melancholy'],
+  [/\bover it\b/g, 'intensity'], [/\bfed up\b/g, 'intensity'],
+];
+function dimForValence(v, t, tokens, i) {
+  if (v >= 2.3) return 'joy';
+  if (v > 0) return 'warmth';
+  const aimed = tokens.slice(Math.max(0, i - 4), i).some((x) => x === 'you' || x === 'your' || x === "you're");
+  return HOSTILE.has(t) || (v <= -2.4 && aimed) ? 'intensity' : 'melancholy';
+}
+
+// One pass over the words. weightAt(i) lets callers favour recent words or the ending.
+function readTokens(tokens, weightAt, skipLast = false) {
+  const acc = Object.fromEntries(DIMENSIONS.map((d) => [d.id, 0]));
+  const hits = Object.fromEntries(DIMENSIONS.map((d) => [d.id, []]));
+  const negated = [];
+  let pos = 0, neg = 0, wsum = 0;
+  const turnsAfter = new Array(tokens.length).fill(0);
+  for (let i = tokens.length - 1, t = 0; i >= 0; i--) {
+    turnsAfter[i] = t;
+    if (TURNS.has(tokens[i]) || (tokens[i] === 'kidding' && tokens[i - 1] === 'just')) t++;
+  }
+  tokens.forEach((t, i) => {
+    const w = weightAt(i) * 0.45 ** turnsAfter[i];
+    wsum += w;
+    if (skipLast && i === tokens.length - 1) return;
+    const negatedHere = [tokens[i - 1], tokens[i - 2]].some((p) => p && NEGATORS.has(p));
+    const dim = lookup(t);
+    let v = valenceOf(t);
+    if (negatedHere) v = -v * 0.7;
+    if (v > 0) pos += w * v * v; else if (v < 0) neg += w * v * v;
+    if (dim) {
+      if (negatedHere && dim !== 'formality' && dim !== 'technical') {
+        negated.push(t);
+        // "not happy" isn't neutral: it reads as a little low.
+        if (dim === 'joy' || dim === 'warmth') { acc.melancholy += w * 0.6; hits.melancholy.push(`not ${t}`); }
+        return;
+      }
+      acc[dim] += w * (KIN.has(t) ? 0.5 : 1);
+      hits[dim].push(t);
+    } else if (Math.abs(v) >= 1.5) {
+      const d = dimForValence(v, t, tokens, i);
+      acc[d] += w * 0.85;
+      hits[d].push(negatedHere ? `not ${t}` : t);
+    }
+  });
+  // Phrases override their words: "thanks for nothing" is not gratitude.
+  const joined = tokens.join(' ');
+  for (const [re, d] of PHRASES) for (const m of joined.matchAll(re)) {
+    const i = joined.slice(0, m.index).split(' ').length - 1;
+    const w = weightAt(Math.max(0, i)) * 0.45 ** (turnsAfter[i] || 0);
+    acc[d] += w * 1.4; hits[d].push(m[0]); neg += w * 6;
+    if (/thank/.test(m[0])) { acc.warmth = Math.max(0, acc.warmth - w); }
+  }
+  // Overall direction, -1 (hostile, bleak) to +1 (glowing). Strong words dominate.
+  const valence = (pos - neg) / (pos + neg + 1);
+  return { acc, hits, negated, valence, wsum };
+}
+
+// A clearly negative message can't read as warm or joyful, and vice versa.
+function balance(p, valence) {
+  if (valence < -0.12) { const f = Math.max(0.1, 1 + valence * 1.3); p.warmth *= f; p.joy *= f; }
+  if (valence > 0.12) { const f = 1 - valence * 0.7; p.melancholy *= f; p.intensity *= f; p.tension *= 1 - valence * 0.5; }
+}
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // Soft saturation: a few hits register, many hits approach 1 without exceeding it.
@@ -36,20 +120,11 @@ export function analyze(raw) {
   const sentences = text.split(/(?<=[.!?…])\s+|\n{2,}/).map((s) => s.trim()).filter(Boolean);
   const lines = text.split('\n').filter((l) => l.trim());
 
-  // ---- Lexicon pass, with simple negation ("not happy" doesn't count as joy)
-  const hits = Object.fromEntries(DIMENSIONS.map((d) => [d.id, []]));
-  const negated = [];
-  tokens.forEach((t, i) => {
-    const dim = lookup(t);
-    if (!dim) return;
-    const prev = [tokens[i - 1], tokens[i - 2]];
-    if (prev.some((p) => p && NEGATORS.has(p)) && dim !== 'formality' && dim !== 'technical') {
-      negated.push(t);
-      return;
-    }
-    hits[dim].push(t);
-  });
-
+  // ---- Word pass: tone lexicon + valence, negation, turns; the ending counts most.
+  const nT = tokens.length;
+  const read = readTokens(tokens, (i) => 0.6 + 0.8 * (nT > 1 ? i / (nT - 1) : 1));
+  const { hits, negated } = read;
+  const scale = wordCount / Math.max(read.wsum, 1);
   // ---- Structural signals
   const count = (re) => (text.match(re) || []).length;
   const per100 = (n) => (wordCount ? (n / wordCount) * 100 : 0);
@@ -74,7 +149,7 @@ export function analyze(raw) {
 
   // ---- Tone profile (0..1 each). Lexicon density does most of the work;
   // structural signals nudge it.
-  const density = (dim) => per100(hits[dim].length);
+  const density = (dim) => per100(read.acc[dim] * scale);
   const p = {};
   const K = 0.16;
   p.warmth = squash(density('warmth'), K);
@@ -92,6 +167,7 @@ export function analyze(raw) {
     clamp01(per100(informal) / 3) * 0.3
   );
   p.technical = squash(density('technical') + per100(digits) * 0.6 + per100(imperatives) * 2, K);
+  balance(p, read.valence);
   for (const k in p) p[k] = Math.round(clamp01(p[k]) * 100) / 100;
 
   // ---- Intent: what kind of writing is this?
@@ -111,7 +187,7 @@ export function analyze(raw) {
   const lengthFactor = clamp01((wordCount - 25) / 300); // 0 = tiny, 1 = long read
 
   return {
-    text, profile: p, hits, negated, intent, intents, lengthClass, lengthFactor,
+    text, profile: p, hits, negated, valence: read.valence, intent, intents, lengthClass, lengthFactor,
     stats: {
       words: wordCount, sentences: sentences.length,
       avgSentence: Math.round(avgSentence * 10) / 10,
@@ -130,17 +206,8 @@ export function lean(text, halfLife = 10) {
   const tokens = text.toLowerCase().match(/[a-z']+/g) || [];
   const typing = /[a-z']$/i.test(text);
   const n = tokens.length;
-  const acc = Object.fromEntries(DIMENSIONS.map((d) => [d.id, 0]));
-  let wsum = 0;
-  tokens.forEach((t, i) => {
-    const w = Math.pow(0.5, (n - 1 - i) / halfLife);
-    wsum += w;
-    if (typing && i === n - 1) return;
-    const dim = lookup(t);
-    if (!dim) return;
-    if ([tokens[i - 1], tokens[i - 2]].some((p) => p && NEGATORS.has(p))) return;
-    acc[dim] += w;
-  });
+  const read = readTokens(tokens, (i) => Math.pow(0.5, (n - 1 - i) / halfLife), typing);
+  const { acc, wsum } = read;
 
   let predicted = null;
   if (typing && n) {
@@ -180,6 +247,7 @@ export function lean(text, halfLife = 10) {
     formality: Math.max(squash(dens('formality'), K * 1.4), analyze(text.slice(-600)).profile.formality * 0.9),
     technical: Math.max(squash(dens('technical'), K), analyze(text.slice(-400)).profile.technical * 0.9),
   };
+  balance(p, read.valence);
   for (const k in p) p[k] = Math.round(clamp01(p[k]) * 100) / 100;
-  return { profile: p, predicted };
+  return { profile: p, predicted, valence: read.valence };
 }

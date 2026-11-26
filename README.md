@@ -34,7 +34,10 @@ GitHub Pages is public, so the API key lives in a tiny Cloudflare Worker (free t
 ## How the offline rules work
 
 1. **Read.** It counts words, sentences, average sentence and word length, exclamations, questions, ellipses, contractions, numbers, imperative sentences and line breaks.
-2. **Feel.** A hand-written lexicon maps words to nine tone dimensions: warmth, joy, melancholy, intensity, tension, wonder, gravity, formality and technical. Punctuation nudges the result (ellipses add melancholy and tension, capitals and exclamations add intensity). Negation is handled simply: "not happy" doesn't count as joy.
+2. **Feel.** A hand-written lexicon maps words to nine tone dimensions: warmth, joy, melancholy, intensity, tension, wonder, gravity, formality and technical. Behind it, the [VADER](https://github.com/cjhutto/vaderSentiment) sentiment lexicon (about 5,500 words) gives every other word a positive or negative weight, so "horrible" or "devastated" register even though they aren't in the hand list. Contempt reads as intensity, hurt as melancholy. Punctuation nudges the result (ellipses add melancholy and tension, capitals and exclamations add intensity).
+   - **Direction.** An overall mood from dark to bright is computed. A clearly negative message can't read as warm or joyful ("Hello Mother, wishing you a horrible day" is hostile, not loving), and bright, bouncy faces are kept away from hostile or grieving text.
+   - **Negation and turns.** "Not happy" reads as low, not neutral. Words like *but*, *nevermind* and *just kidding* discount what came before, and the ending of a message counts most.
+   - **Phrases.** A few phrases override their words: "thanks for nothing", "yeah right", "I can't do this anymore".
 3. **Classify.** The text is read as one of: narrative, poetic, personal message, formal writing, instructions, promotional copy or general prose.
 4. **Match.** Each of the 36 typefaces in the pool has trait scores on the same nine dimensions, plus *legibility* (stamina over long text) and *personality* (character in short bursts). The score compares the text's profile with each face, weighting the dimensions the text expresses most strongly. Faces suited to the intent get a small bonus, and faces that are wrong for it (a casual brush face for launch copy, for example) get a penalty. Long text rewards legibility; short text rewards personality.
 5. **Set.** Size, leading, line length and weight follow from length and the face's own proportions.
@@ -61,6 +64,7 @@ pool.json         the 80-font pool Claude chooses from
 worker/           Cloudflare Worker that holds the API key and asks Claude
 src/config.js     your Worker URL
 src/lexicon.js    tone dimensions and word lists
+src/valence.js    VADER word valence (MIT), positive and negative weights
 src/analyze.js    text → tone profile, intent, length, evidence
 src/fonts.js      typeface pool with trait scores
 src/recommend.js  scoring, ranking and typesetting rules
@@ -83,4 +87,4 @@ fonts/            Departure Mono (interface type, SIL OFL), self-hosted
 
 ## Credits
 
-The writing typefaces are from Google Fonts. The interface is set in [Departure Mono](https://departuremono.com) by Helena Zhang. All the fonts are under the SIL Open Font License (see `fonts/DepartureMono-OFL.txt`). The code is MIT-licensed.
+The writing typefaces are from Google Fonts. Word valence comes from the VADER lexicon by C.J. Hutto (MIT License). The interface is set in [Departure Mono](https://departuremono.com) by Helena Zhang. All the fonts are under the SIL Open Font License (see `fonts/DepartureMono-OFL.txt`). The code is MIT-licensed.

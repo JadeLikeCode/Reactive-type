@@ -115,8 +115,16 @@ function applyScale(words) {
 }
 
 // ---------------------------------------------------------------- meters
-function renderMeters(tone, hot = [], leaning = null) {
-  $('meters').innerHTML = DIMENSIONS.map((d) => {
+function renderMeters(tone, hot = [], leaning = null, valence = null) {
+  // Mood: one bipolar meter, negative on the left, positive on the right.
+  let mood = '';
+  if (valence != null) {
+    const pos = Math.round((clamp01((valence + 1) / 2)) * 10);
+    const bar = [...'▯▯▯▯▯▯▯▯▯▯▯'].map((c, i) => (i === pos ? '◆' : i === 5 ? '┃' : c)).join('');
+    const label = valence < -0.15 ? 'dark' : valence > 0.15 ? 'bright' : 'even';
+    mood = `<div class="meter mood${Math.abs(valence) > 0.3 ? ' hot' : ''}" title="Overall direction: negative to positive"><span>mood</span><span class="bar">${bar}</span><span class="v">${label}</span></div>`;
+  }
+  $('meters').innerHTML = mood + DIMENSIONS.map((d) => {
     const v = clamp01(tone?.[d.id]);
     const n = Math.round(v * 10);
     return `<div class="meter${hot.includes(d.id) ? ' hot' : ''}${leaning === d.id ? ' lean' : ''}" title="${esc(d.hint)}"><span>${esc(lower(d.label))}</span><span class="bar">${'▮'.repeat(n)}${'▯'.repeat(10 - n)}</span><span class="v">${String(Math.round(v * 100)).padStart(2, '0')}</span></div>`;
@@ -147,9 +155,9 @@ function live() {
   }
   const L = lean(text);
   const full = analyze(text);
-  const r = recommend({ ...full, profile: L.profile });
+  const r = recommend({ ...full, profile: L.profile, valence: L.valence });
   applyField(L.profile);
-  renderMeters(L.profile, hotOf(L.profile), L.predicted?.dim);
+  renderMeters(L.profile, hotOf(L.profile), L.predicted?.dim, L.valence);
   const lean_ = L.predicted && !L.predicted.done ? ` · leaning → ${lower(DIMENSIONS.find((d) => d.id === L.predicted.dim).label)} (${L.predicted.word}?)` : '';
   status(`${words} words · ${INTENT_LABEL[full.intent]}${lean_}`);
   const quiet = Math.max(...Object.values(L.profile)) < 0.12;
@@ -215,7 +223,7 @@ function show(v, text) {
   applyFace(v.font, v.setting);
   applyExpression(v.tone, v.setting.weight);
   applyField(v.tone);
-  renderMeters(v.tone, hotOf(v.tone));
+  renderMeters(v.tone, hotOf(v.tone), null, v.valence);
   grow();
   const ev = v.source === 'rules' ? v.evidence.slice(0, 6) : v.evidence;
   renderMirror(text, ev);
@@ -259,7 +267,7 @@ function fromRules(a, note) {
     return { name: x.font.name, why: `further from the text on ${lower(gap.label)}.` };
   });
   return {
-    source: 'rules', font: f, intent: INTENT_LABEL[a.intent], voice: null, tone: a.profile, evidence, reasoning, alternates,
+    source: 'rules', font: f, intent: INTENT_LABEL[a.intent], voice: null, tone: a.profile, valence: a.valence, evidence, reasoning, alternates,
     setting: { ...set, why: { short: 'short copy: large, tight leading.', medium: 'medium copy: comfortable reading size.', long: 'long copy: smaller, looser leading for stamina.' }[a.lengthClass] },
     words: a.stats.words,
   };

@@ -13,7 +13,7 @@ export function recommend(a, pool = FONTS) {
     // calm, neutral paragraph prefers calm, neutral faces.
     let num = 0, den = 0;
     const parts = ids.map((id) => {
-      const w = 0.25 + p[id] * 1.75;
+      const w = 0.45 + p[id] * 1.75;
       const close = 1 - Math.abs(p[id] - f.t[id]);
       num += w * close; den += w;
       return { id, w, close, contrib: w * close * p[id] };
@@ -23,6 +23,10 @@ export function recommend(a, pool = FONTS) {
     // Intent fit: a typeface that suits this kind of writing gets a nudge.
     const intentFit = f.intents.includes(a.intent);
     if (intentFit) score += 0.05;
+    // Polarity: a bright, bouncy face can't carry a hostile or grieving message, and vice versa.
+    const v = a.valence || 0;
+    if (v < -0.2) score -= (-v) * 0.25 * Math.max(0, f.t.joy - 0.5) * 2;
+    if (v > 0.2) score -= v * 0.12 * Math.max(0, Math.max(f.t.tension, f.t.melancholy) - 0.6) * 2.5;
     // Some faces are simply wrong for some kinds of writing, however the tone scores.
     if ((f.avoid || []).includes(a.intent)) score -= 0.12;
 
