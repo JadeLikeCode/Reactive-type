@@ -2,7 +2,7 @@
 // Two speeds: a fast local reading reacts on every keystroke;
 // Enter asks Claude (or the offline rules) for a considered reading.
 
-import { analyze } from './analyze.js';
+import { analyze, lean } from './analyze.js';
 import { recommend, setting } from './recommend.js';
 import { DIMENSIONS } from './lexicon.js';
 import { FONTS } from './fonts.js';
@@ -24,16 +24,17 @@ const INTENT_LABEL = {
 // Each tone owns a field: a base colour and three glows. The live field is a
 // weighted blend of all of them, so the background drifts as the tone drifts.
 const FIELDS = {
-  neutral:    { base: '#101114', g: ['#2b3140', '#1c2a2a', '#24202e'], accent: '#9ad0ff' },
-  warmth:     { base: '#2a120c', g: ['#ff6a3d', '#ffb070', '#c2410c'], accent: '#ffd2a8' },
-  joy:        { base: '#f3ecdc', g: ['#ffcf3f', '#ff7ac6', '#7ee0ff'], accent: '#d6336c' },
-  melancholy: { base: '#0c1320', g: ['#3b5a8a', '#6f7f99', '#1e2f4d'], accent: '#a9c1e8' },
-  intensity:  { base: '#1c0505', g: ['#ff2a1a', '#ff8a00', '#8a0d0d'], accent: '#ffd166' },
-  tension:    { base: '#040605', g: ['#1f7a4a', '#0d2a1d', '#3a1d1d'], accent: '#62ff9d' },
-  wonder:     { base: '#0b0a24', g: ['#7b5cff', '#38d1ff', '#ff8be0'], accent: '#c7b8ff' },
-  gravity:    { base: '#17150f', g: ['#8a7a55', '#3a3428', '#5b4a2e'], accent: '#e3d3a8' },
-  formality:  { base: '#ebeae5', g: ['#c9ccd6', '#9aa3b5', '#e2dccd'], accent: '#3446a3' },
-  technical:  { base: '#071016', g: ['#00b8e6', '#2a5cff', '#0b3a4a'], accent: '#00e1ff' },
+  //           base         glows                                   accent     grid  glow
+  neutral:    { base: '#0f1013', g: ['#2a2f3b', '#1a2526', '#221e2b'], accent: '#9ad0ff', grid: .08, glow: .55 },
+  warmth:     { base: '#3a1408', g: ['#ff5a1f', '#ffb36b', '#d4380d'], accent: '#ffd2a8', grid: .03, glow: .95 },
+  joy:        { base: '#ffe7a3', g: ['#ffcc00', '#ff5fb4', '#4fd8ff'], accent: '#c2185b', grid: .05, glow: 1 },
+  melancholy: { base: '#070d1c', g: ['#2b4c86', '#5c6f93', '#14213d'], accent: '#a9c1e8', grid: .04, glow: .7 },
+  intensity:  { base: '#2b0000', g: ['#ff1a0d', '#ff7a00', '#a30000'], accent: '#ffe066', grid: .1, glow: 1 },
+  tension:    { base: '#020302', g: ['#0f5c32', '#071a10', '#3d0f12'], accent: '#5cff8f', grid: .14, glow: .6 },
+  wonder:     { base: '#0a0628', g: ['#7a4dff', '#2ad4ff', '#ff6fd8'], accent: '#d4c7ff', grid: .04, glow: .95 },
+  gravity:    { base: '#140f08', g: ['#7d6438', '#2e271c', '#4f3b1d'], accent: '#e6d3a3', grid: .06, glow: .65 },
+  formality:  { base: '#f1efe9', g: ['#d6d3ca', '#b8bfcc', '#e8e1d0'], accent: '#22308c', grid: .1, glow: .6 },
+  technical:  { base: '#02070b', g: ['#00c2ff', '#1f4dff', '#003b4f'], accent: '#00f0ff', grid: .2, glow: .85 },
 };
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -47,18 +48,28 @@ function mix(cols, ws) {
 
 function applyField(tone) {
   const keys = Object.keys(FIELDS);
-  const raw = keys.map((k) => (k === 'neutral' ? 0.12 : clamp01(tone?.[k]) ** 2.2));
+  // Cubed weights: the dominant mood takes over the screen instead of averaging to mud.
+  const raw = keys.map((k) => (k === 'neutral' ? 0.035 : clamp01(tone?.[k]) ** 3));
   const sum = raw.reduce((a, b) => a + b, 0);
   const w = raw.map((x) => x / sum);
   const base = mix(keys.map((k) => FIELDS[k].base), w);
   const lum = 0.2126 * base[0] + 0.7152 * base[1] + 0.0722 * base[2];
   root.setProperty('--base', toHex(base));
-  root.setProperty('--ink', lum > 0.35 ? '#141416' : '#f1efe9');
+  root.setProperty('--ink', lum > 0.3 ? '#141416' : '#f3f1ec');
   [0, 1, 2].forEach((i) => root.setProperty(`--g${i + 1}`, toHex(mix(keys.map((k) => FIELDS[k].g[i]), w))));
-  // Accent follows the strongest tone, so it stays a real colour rather than a muddy average.
   const top = keys[w.indexOf(Math.max(...w))];
   root.setProperty('--accent', FIELDS[top].accent);
-  body.toggleAttribute('data-pulse', Math.max(...raw.slice(1)) > 0.5);
+  root.setProperty('--grid-a', keys.reduce((a, k, i) => a + FIELDS[k].grid * w[i], 0).toFixed(3));
+  root.setProperty('--glow-a', keys.reduce((a, k, i) => a + FIELDS[k].glow * w[i], 0).toFixed(3));
+}
+
+// Between face swaps, the type keeps moving: weight and spacing follow the tone.
+function applyExpression(tone, baseWeight = 400) {
+  const t = (k) => clamp01(tone?.[k]);
+  const weight = Math.round((baseWeight + t('intensity') * 260 + t('joy') * 60 - t('melancholy') * 90 - t('wonder') * 50) / 10) * 10;
+  const track = (t('wonder') * 0.035 + t('formality') * 0.01 + t('melancholy') * 0.01 - t('intensity') * 0.02 - t('tension') * 0.015).toFixed(3);
+  root.setProperty('--weight', Math.max(250, Math.min(800, weight)));
+  root.setProperty('--track', `${track}em`);
 }
 
 // ---------------------------------------------------------------- fonts
@@ -68,7 +79,7 @@ const loaded = new Map();
 function loadFont(f) {
   if (loaded.has(f.name)) return loaded.get(f.name);
   const n = f.name.replace(/ /g, '+');
-  const tries = [f.q, `${n}:ital,wght@0,400;0,700;1,400`, `${n}:wght@400;700`, n].filter(Boolean);
+  const tries = [`${n}:wght@300..800`, f.q, `${n}:ital,wght@0,400;0,700;1,400`, `${n}:wght@400;700`, n].filter(Boolean);
   const attempt = (i) => new Promise((resolve) => {
     if (i >= tries.length) return resolve(false);
     const link = document.createElement('link');
@@ -88,7 +99,7 @@ const lower = (s) => s.toLowerCase();
 function applyFace(f, set) {
   root.setProperty('--face', f ? stack(f) : 'var(--mono)');
   root.setProperty('--fvs', f?.fvs || 'normal');
-  root.setProperty('--weight', set?.weight || 400);
+  baseWeight = set?.weight || f?.weight || 400;
   $('face-name').textContent = f ? lower(f.name) : 'departure mono';
   $('face-class').textContent = f ? `/ ${lower(f.cls)}` : '/ waiting for tone';
 }
@@ -104,87 +115,102 @@ function applyScale(words) {
 }
 
 // ---------------------------------------------------------------- meters
-function renderMeters(tone, hot = []) {
+function renderMeters(tone, hot = [], leaning = null) {
   $('meters').innerHTML = DIMENSIONS.map((d) => {
     const v = clamp01(tone?.[d.id]);
     const n = Math.round(v * 10);
-    return `<div class="meter${hot.includes(d.id) ? ' hot' : ''}" title="${esc(d.hint)}"><span>${esc(lower(d.label))}</span><span class="bar">${'▮'.repeat(n)}${'▯'.repeat(10 - n)}</span><span class="v">${String(Math.round(v * 100)).padStart(2, '0')}</span></div>`;
+    return `<div class="meter${hot.includes(d.id) ? ' hot' : ''}${leaning === d.id ? ' lean' : ''}" title="${esc(d.hint)}"><span>${esc(lower(d.label))}</span><span class="bar">${'▮'.repeat(n)}${'▯'.repeat(10 - n)}</span><span class="v">${String(Math.round(v * 100)).padStart(2, '0')}</span></div>`;
   }).join('');
 }
 const hotOf = (tone) => Object.entries(tone).filter(([, v]) => v >= 0.25).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
 
 // ---------------------------------------------------------------- live reaction
-let current = null, currentScore = 0, liveTimer = 0;
+let current = null, baseWeight = 400, lastSwap = 0, frame = 0;
 function grow() { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
 
 function live() {
+  frame = 0;
   const text = input.value;
   const words = (text.match(/[A-Za-z']+/g) || []).length;
   applyScale(words);
   grow();
   try { localStorage.setItem('reactive-draft', text); } catch {}
-  if (words < 3) {
-    applyField(null); renderMeters({}); swapFace(null);
+  if (words < 2) {
+    applyField(null); applyExpression(null); renderMeters({}); swapFace(null);
     status(words ? 'keep going…' : 'listening'); return;
   }
-  // React to the most recent passage so the type follows the tone as it turns.
-  const recent = (text.match(/[^\s]+/g) || []).slice(-60).join(' ');
-  const a = analyze(recent);
+  const L = lean(text);
   const full = analyze(text);
-  const r = recommend({ ...a, lengthFactor: full.lengthFactor, lengthClass: full.lengthClass });
-  applyField(a.profile);
-  renderMeters(a.profile, hotOf(a.profile));
-  const quiet = Math.max(...Object.values(a.profile)) < 0.15;
-  const best = quiet && words < 8 ? null : r.best;
-  // Hysteresis: only change face when the new one clearly wins, so it doesn't flicker.
-  if (best && current && best.font.name !== current.name) {
+  const r = recommend({ ...full, profile: L.profile });
+  applyField(L.profile);
+  renderMeters(L.profile, hotOf(L.profile), L.predicted?.dim);
+  const lean_ = L.predicted && !L.predicted.done ? ` · leaning → ${lower(DIMENSIONS.find((d) => d.id === L.predicted.dim).label)} (${L.predicted.word}?)` : '';
+  status(`${words} words · ${INTENT_LABEL[full.intent]}${lean_}`);
+  const quiet = Math.max(...Object.values(L.profile)) < 0.12;
+  const best = quiet && words < 6 ? null : r.best;
+  applyExpression(L.profile, best ? (best.font.weight || 400) : 400);
+  if (!best) { swapFace(null); return; }
+  if (current && best.font.name !== current.name) {
+    // Hysteresis plus a short cooldown: decisive, but never flickering.
     const cur = r.ranked.find((x) => x.font.name === current.name);
-    if (cur && best.score - cur.score < 0.025) { status(`${words} words · reads as ${INTENT_LABEL[full.intent]}`); return; }
+    if (cur && best.score - cur.score < 0.02) return;
+    if (performance.now() - lastSwap < 280) { setTimeout(schedule, 300); return; }
   }
-  swapFace(best ? best.font : null, best ? setting(full, best.font) : null);
-  status(`${words} words · reads as ${INTENT_LABEL[full.intent]}`);
+  swapFace(best.font, setting(full, best.font));
 }
+function schedule() { if (!frame) frame = requestAnimationFrame(live); }
 
-let swapId = 0;
-async function swapFace(f, set) {
-  if ((f?.name || null) === (current?.name || null)) { if (set) root.setProperty('--weight', set.weight); return; }
+let swapId = 0, pending = null;
+async function swapFace(f) {
+  const name = f?.name || null;
+  if (name === (current?.name || null)) { if (pending) { pending = null; swapId++; } return; }
+  if (name === pending) return; // already on its way; don't restart the load
+  pending = name;
   const id = ++swapId;
   if (f) await loadFont(f);
   if (id !== swapId) return;
+  pending = null;
+  lastSwap = performance.now();
   input.classList.add('swap');
   setTimeout(() => {
     if (id !== swapId) return;
     current = f;
-    applyFace(f, set);
+    applyFace(f);
     grow();
-    input.classList.remove('swap');
-  }, 160);
+    requestAnimationFrame(() => input.classList.remove('swap'));
+  }, 90);
 }
 
 // ---------------------------------------------------------------- the considered reading
+let readId = 0;
 async function settle() {
   const text = input.value;
   if ((text.match(/[A-Za-z']+/g) || []).length < 3) { status('write a sentence first'); return; }
+  const id = ++readId;
   const a = analyze(text);
-  setMode('reading');
-  input.readOnly = true;
-  status(WORKER_URL ? 'claude is reading…' : 'reading…');
-  let v = null, note = '';
-  if (WORKER_URL) {
-    try { await poolReady; v = await fromClaude(text, a); }
-    catch (e) { console.warn(e); note = 'Claude was unreachable, so the offline rules made this reading.'; }
+  show(fromRules(a, ''), text);             // instant
+  if (!WORKER_URL) return;
+  status('read by rules · claude is refining…');
+  try {
+    await poolReady;
+    const v = await fromClaude(text, a);
+    await loadFont(v.font);
+    if (id === readId && input.value === text && body.dataset.mode === 'set') show(v, text);
+  } catch (e) {
+    console.warn(e);
+    if (id === readId && body.dataset.mode === 'set') status('read by rules · claude unreachable');
   }
-  if (!v) v = fromRules(a, note);
-  await loadFont(v.font);
-  input.readOnly = false;
-  if (input.value !== text) return; // they kept typing; stay live
-  swapId++; // cancel any pending live swap
-  input.classList.remove('swap');
+}
+
+function show(v, text) {
+  loadFont(v.font); // applied at once; the browser swaps the glyphs in when the file lands
+  swapId++; pending = null; input.classList.remove('swap');
   current = v.font;
   applyFace(v.font, v.setting);
-  grow();
+  applyExpression(v.tone, v.setting.weight);
   applyField(v.tone);
   renderMeters(v.tone, hotOf(v.tone));
+  grow();
   const ev = v.source === 'rules' ? v.evidence.slice(0, 6) : v.evidence;
   renderMirror(text, ev);
   renderNotes(v, ev);
@@ -264,7 +290,7 @@ function renderNotes(v, ev) {
     <section><h3>why</h3>${v.reasoning.map((p) => `<p>${esc(p)}</p>`).join('')}</section>
     ${v.alternates.length ? `<section><h3>also considered</h3><ul>${v.alternates.map((x) => `<li>${esc(x.name)} <span class="r">— ${esc(x.why)}</span></li>`).join('')}</ul></section>` : ''}
     <section><h3>suggested setting</h3><dl><dt>size</dt><dd>${s.size}px</dd><dt>leading</dt><dd>${s.leading}</dd><dt>measure</dt><dd>${s.measure}ch</dd><dt>weight</dt><dd>${s.weight}</dd></dl><p class="r" style="margin-top:6px">${esc(lower(s.why))}</p></section>
-    <section><p class="r">${v.source === 'ai' ? `claude${v.model ? ` (${esc(v.model)})` : ''} chose from ${POOL.length} typefaces.` : 'offline rules · 20 hand-scored faces.'}</p></section>`;
+    <section><p class="r">${v.source === 'ai' ? `claude${v.model ? ` (${esc(v.model)})` : ''} chose from ${POOL.length} typefaces.` : `offline rules · ${FONTS.length} hand-scored faces.`}</p></section>`;
 }
 
 // ---------------------------------------------------------------- modes, keys, status
@@ -278,16 +304,19 @@ function setMode(m) {
 
 input.addEventListener('input', () => {
   if (body.dataset.mode === 'set') setMode('write'); // editing in place: marks fade, notes tuck away
-  clearTimeout(liveTimer); liveTimer = setTimeout(live, 140); grow();
+  grow(); schedule();
 });
 input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (body.dataset.mode !== 'reading') settle(); }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); settle(); }
 });
 window.addEventListener('resize', grow);
+// Re-measure whenever the type changes size under us: font files landing, size easing in.
+input.addEventListener('transitionend', grow);
+document.fonts.addEventListener?.('loadingdone', grow);
 
 // Warm the offline faces so live swaps are instant.
 const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));
-idle(() => FONTS.forEach((f, i) => setTimeout(() => loadFont(f), i * 120)));
+idle(() => FONTS.forEach((f, i) => setTimeout(() => loadFont(f), i * 60)));
 
 // Start: restore a draft if there is one, otherwise an empty, listening screen.
 {

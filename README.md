@@ -6,13 +6,13 @@ Start typing and the page listens. As the tone of your words shifts, the typefac
 
 ## Two speeds
 
-- **Live (as you type).** A fast local reading of your most recent words drives the typeface, the colour field and the tone meters on every keystroke. It runs entirely in the browser.
-- **Considered (on Enter).** Claude reads the whole text and returns the face, the setting and the reasoning. If Claude isn't configured or can't be reached, the offline rules do this instead.
+- **Live (as you type).** Every keystroke updates the reading. Your newest words count most, and the word you're still typing is guessed from its first letters ("furi…" leans toward intensity before you finish), so the type moves ahead of you. Weight and letter spacing glide with the tone between typeface changes, and the meters show which way it's leaning. It all runs in the browser.
+- **Considered (on Enter).** The offline reading appears instantly: the face settles, the signal words are marked, and the notes slide in. If Claude is connected, it refines the reading a moment later and swaps in its own choice and reasoning.
 
 ## Two readers
 
 - **Claude (live).** When a Worker URL is set in `src/config.js`, the text goes to Claude, which reads it the way a type director would: tone, voice, intent, subtext and length. It then picks from a curated pool of **79 Google Fonts** (`pool.json`) and explains its choice in plain language. It also points to the exact phrases that shaped its reading, which the page underlines.
-- **Rules (offline fallback).** If no Worker is configured or it can't be reached, a transparent scoring model picks from 20 hand-scored faces. It's described below.
+- **Rules (offline fallback).** If no Worker is configured or it can't be reached, a transparent scoring model picks from 36 hand-scored faces. It's described below.
 
 ## Hook up Claude (about 5 minutes)
 
@@ -36,7 +36,7 @@ GitHub Pages is public, so the API key lives in a tiny Cloudflare Worker (free t
 1. **Read.** It counts words, sentences, average sentence and word length, exclamations, questions, ellipses, contractions, numbers, imperative sentences and line breaks.
 2. **Feel.** A hand-written lexicon maps words to nine tone dimensions: warmth, joy, melancholy, intensity, tension, wonder, gravity, formality and technical. Punctuation nudges the result (ellipses add melancholy and tension, capitals and exclamations add intensity). Negation is handled simply: "not happy" doesn't count as joy.
 3. **Classify.** The text is read as one of: narrative, poetic, personal message, formal writing, instructions, promotional copy or general prose.
-4. **Match.** Each of the 20 typefaces in the pool has trait scores on the same nine dimensions, plus *legibility* (stamina over long text) and *personality* (character in short bursts). The score compares the text's profile with each face, weighting the dimensions the text expresses most strongly. Faces suited to the intent get a small bonus, and faces that are wrong for it (a casual brush face for launch copy, for example) get a penalty. Long text rewards legibility; short text rewards personality.
+4. **Match.** Each of the 36 typefaces in the pool has trait scores on the same nine dimensions, plus *legibility* (stamina over long text) and *personality* (character in short bursts). The score compares the text's profile with each face, weighting the dimensions the text expresses most strongly. Faces suited to the intent get a small bonus, and faces that are wrong for it (a casual brush face for launch copy, for example) get a penalty. Long text rewards legibility; short text rewards personality.
 5. **Set.** Size, leading, line length and weight follow from length and the face's own proportions.
 
 While you write, the meters on the left show the live tone. Press **Enter** for the considered reading (**Shift+Enter** adds a new line), and **Esc**, or just keep typing, to go back to writing.

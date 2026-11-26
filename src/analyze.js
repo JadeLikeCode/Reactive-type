@@ -120,3 +120,66 @@ export function analyze(raw) {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Live reading. Recent words count most (exponential decay), and the word
+// still being typed is guessed from its first letters, so the type can lean
+// toward where the sentence is going before the word is finished.
+const LEX_WORDS = [...LEXICON.keys()];
+export function lean(text, halfLife = 10) {
+  const tokens = text.toLowerCase().match(/[a-z']+/g) || [];
+  const typing = /[a-z']$/i.test(text);
+  const n = tokens.length;
+  const acc = Object.fromEntries(DIMENSIONS.map((d) => [d.id, 0]));
+  let wsum = 0;
+  tokens.forEach((t, i) => {
+    const w = Math.pow(0.5, (n - 1 - i) / halfLife);
+    wsum += w;
+    if (typing && i === n - 1) return;
+    const dim = lookup(t);
+    if (!dim) return;
+    if ([tokens[i - 1], tokens[i - 2]].some((p) => p && NEGATORS.has(p))) return;
+    acc[dim] += w;
+  });
+
+  let predicted = null;
+  if (typing && n) {
+    const part = tokens[n - 1];
+    const exact = lookup(part);
+    if (exact) { acc[exact] += 1; predicted = { dim: exact, word: part, done: true }; }
+    else if (part.length >= 3) {
+      const counts = {}, example = {};
+      for (const w of LEX_WORDS) if (w.startsWith(part)) {
+        const d = LEXICON.get(w);
+        counts[d] = (counts[d] || 0) + 1;
+        if (!example[d] || w.length < example[d].length) example[d] = w;
+      }
+      // Ambiguous prefixes ("dre" → dream or dread?) are settled by the mood so far.
+      const best = Object.entries(counts).map(([d, c]) => [d, Math.sqrt(c) * (1 + 4 * acc[d])]).sort((a, b) => b[1] - a[1])[0];
+      if (best) { acc[best[0]] += 0.75; predicted = { dim: best[0], word: example[best[0]], done: false }; }
+    }
+  }
+
+  // Punctuation and structure from the recent tail.
+  const tail = text.slice(-240);
+  const tailWords = Math.max(4, (tail.match(/[A-Za-z']+/g) || []).length);
+  const per = (x) => (x / tailWords) * 100;
+  const ex = (tail.match(/!/g) || []).length, el = (tail.match(/\.\.\.|…/g) || []).length;
+  const caps = (tail.match(/\b[A-Z]{3,}\b/g) || []).length, q = (tail.match(/\?/g) || []).length;
+  const dens = (d) => (acc[d] / Math.max(wsum, 1)) * 100;
+  const K = 0.14;
+  const recent = analyze(text.slice(-500));
+  const p = {
+    warmth: squash(dens('warmth'), K),
+    joy: squash(dens('joy') + (acc.joy ? per(ex) * 0.5 : 0), K),
+    melancholy: squash(dens('melancholy') + per(el) * 1.2, K),
+    intensity: squash(dens('intensity') + per(ex) * 0.9 + per(caps) * 2.2, K),
+    tension: squash(dens('tension') + per(el) * 0.6 + per(q) * 0.3, K),
+    wonder: Math.max(squash(dens('wonder'), K), recent.profile.wonder * 0.8),
+    gravity: squash(dens('gravity'), K * 1.2),
+    formality: Math.max(squash(dens('formality'), K * 1.4), analyze(text.slice(-600)).profile.formality * 0.9),
+    technical: Math.max(squash(dens('technical'), K), analyze(text.slice(-400)).profile.technical * 0.9),
+  };
+  for (const k in p) p[k] = Math.round(clamp01(p[k]) * 100) / 100;
+  return { profile: p, predicted };
+}
