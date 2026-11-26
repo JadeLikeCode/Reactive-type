@@ -252,13 +252,6 @@
   "note": "Grotesque for headlines and data; forceful."
  },
  {
-  "name": "Recursive",
-  "cls": "Casual sans",
-  "note": "Brush-written casual axis; chatty and loose.",
-  "fvs": "'CASL' 1",
-  "q": "Recursive:slnt,wght,CASL@-15..0,400..700,0..1"
- },
- {
   "name": "Manrope",
   "cls": "Modern grotesque",
   "note": "Semi-condensed, clean, contemporary tech."

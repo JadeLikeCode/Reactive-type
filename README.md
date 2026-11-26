@@ -1,13 +1,18 @@
-# Emotive Type
+# Reactive Type
 
-Write or paste some copy. Emotive Type reads its **tone**, **intent** and **length**, picks a body typeface to match, sets it, and explains why.
+Type that reads your tone and reacts as you write.
 
-Choosing a typeface is one of the hardest calls in design and one of the least explained. This project makes that judgement legible: every pick traces back to specific words, punctuation and structure in your text.
+Start typing and the page listens. As the tone of your words shifts, the typeface changes to match: it gets heavier when you get angry, softens into a warm serif when you turn tender, and goes cold and typewritten when something gets tense. The whole field behind the text shifts colour with it. Press **Enter** and it does a deeper reading. It settles on one typeface, sets it properly, and annotates the exact words that drove the choice, like a proofreader's marks.
+
+## Two speeds
+
+- **Live (as you type).** A fast local reading of your most recent words drives the typeface, the colour field and the tone meters on every keystroke. It runs entirely in the browser.
+- **Considered (on Enter).** Claude reads the whole text and returns the face, the setting and the reasoning. If Claude isn't configured or can't be reached, the offline rules do this instead.
 
 ## Two readers
 
-- **Claude (live).** When a Worker URL is set in `src/config.js`, the text goes to Claude, which reads it the way a type director would: tone, voice, intent, subtext and length. It then picks from a curated pool of **80 Google Fonts** (`pool.json`) and explains its choice in plain language. It also points to the exact phrases that shaped its reading, which the page underlines.
-- **Rules (offline fallback).** If no Worker is configured or it can't be reached, a transparent scoring model picks from 21 hand-scored faces. It's described below.
+- **Claude (live).** When a Worker URL is set in `src/config.js`, the text goes to Claude, which reads it the way a type director would: tone, voice, intent, subtext and length. It then picks from a curated pool of **79 Google Fonts** (`pool.json`) and explains its choice in plain language. It also points to the exact phrases that shaped its reading, which the page underlines.
+- **Rules (offline fallback).** If no Worker is configured or it can't be reached, a transparent scoring model picks from 20 hand-scored faces. It's described below.
 
 ## Hook up Claude (about 5 minutes)
 
@@ -21,7 +26,7 @@ GitHub Pages is public, so the API key lives in a tiny Cloudflare Worker (free t
    npx wrangler secret put ANTHROPIC_API_KEY   # paste your key
    npx wrangler deploy
    ```
-3. Copy the URL it prints (`https://emotive-type.<you>.workers.dev`) into `src/config.js`.
+3. Copy the URL it prints (`https://reactive-type.<you>.workers.dev`) into `src/config.js`.
 4. In `worker/wrangler.toml`, set `ALLOWED_ORIGINS` to your Pages URL (for example `https://yourname.github.io`) and deploy again, so other sites can't use your key.
 
 `MODEL` in `wrangler.toml` picks the model: `claude-sonnet-5-5` reads with more nuance, while `claude-haiku-5-5` is faster and cheaper. The Worker forces a structured answer, restricts the choice to fonts in `pool.json`, and drops any quoted evidence that isn't actually in the text.
@@ -31,10 +36,10 @@ GitHub Pages is public, so the API key lives in a tiny Cloudflare Worker (free t
 1. **Read.** It counts words, sentences, average sentence and word length, exclamations, questions, ellipses, contractions, numbers, imperative sentences and line breaks.
 2. **Feel.** A hand-written lexicon maps words to nine tone dimensions: warmth, joy, melancholy, intensity, tension, wonder, gravity, formality and technical. Punctuation nudges the result (ellipses add melancholy and tension, capitals and exclamations add intensity). Negation is handled simply: "not happy" doesn't count as joy.
 3. **Classify.** The text is read as one of: narrative, poetic, personal message, formal writing, instructions, promotional copy or general prose.
-4. **Match.** Each of the 21 typefaces in the pool has trait scores on the same nine dimensions, plus *legibility* (stamina over long text) and *personality* (character in short bursts). The score compares the text's profile with each face, weighting the dimensions the text expresses most strongly. Faces suited to the intent get a small bonus, and faces that are wrong for it (a casual brush face for launch copy, for example) get a penalty. Long text rewards legibility; short text rewards personality.
+4. **Match.** Each of the 20 typefaces in the pool has trait scores on the same nine dimensions, plus *legibility* (stamina over long text) and *personality* (character in short bursts). The score compares the text's profile with each face, weighting the dimensions the text expresses most strongly. Faces suited to the intent get a small bonus, and faces that are wrong for it (a casual brush face for launch copy, for example) get a penalty. Long text rewards legibility; short text rewards personality.
 5. **Set.** Size, leading, line length and weight follow from length and the face's own proportions.
 
-Press **Enter** to set your text (**Shift+Enter** adds a new line). "Mark the words it reacted to" underlines the words that drove the reading.
+While you write, the meters on the left show the live tone. Press **Enter** for the considered reading (**Shift+Enter** adds a new line), and **Esc**, or just keep typing, to go back to writing.
 
 ## Run it
 
@@ -59,7 +64,8 @@ src/lexicon.js    tone dimensions and word lists
 src/analyze.js    text → tone profile, intent, length, evidence
 src/fonts.js      typeface pool with trait scores
 src/recommend.js  scoring, ranking and typesetting rules
-src/app.js        UI
+src/app.js        live reaction, colour field, reading view
+fonts/            Departure Mono (interface type, SIL OFL), self-hosted
 ```
 
 ## Tuning
@@ -77,4 +83,4 @@ src/app.js        UI
 
 ## Credits
 
-All typefaces are from Google Fonts under the SIL Open Font License. The code is MIT-licensed.
+The writing typefaces are from Google Fonts. The interface is set in [Departure Mono](https://departuremono.com) by Helena Zhang. All the fonts are under the SIL Open Font License (see `fonts/DepartureMono-OFL.txt`). The code is MIT-licensed.

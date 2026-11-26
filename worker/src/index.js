@@ -1,4 +1,4 @@
-// Emotive Type — Cloudflare Worker
+// Reactive Type — Cloudflare Worker
 // Holds the Anthropic API key and asks Claude to choose a typeface from pool.json.
 // The browser never sees the key.
 

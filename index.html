@@ -3,81 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Emotive Type</title>
-<meta name="description" content="Write something. A typeface is chosen for its tone, intent and length — and it shows its reasoning.">
+<title>Reactive Type</title>
+<meta name="description" content="Type that reads your tone and reacts as you write.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="fonts/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-<header class="band top">
-  <h1>Emotive Type</h1>
-  <p class="lede">Write or paste some copy. It reads the tone, intent and length, picks a body typeface to match, and shows its reasoning.</p>
+<body data-mode="write">
+<div class="field" aria-hidden="true">
+  <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+  <div class="grid"></div>
+</div>
+
+<header class="hud top">
+  <p class="mark">reactive_type<span class="blink">_</span></p>
+  <p class="readout" aria-live="polite"><span class="k">face</span> <span id="face-name">departure mono</span> <span class="dim" id="face-class">/ waiting for tone</span></p>
 </header>
 
-<main>
-  <section class="band compose" aria-label="Your text">
-    <form id="form" novalidate>
-      <label for="input" class="label">Your text</label>
-      <textarea id="input" rows="7" spellcheck="true" placeholder="The morning after the storm, the street was quiet and strangely bright."></textarea>
-      <p id="error" class="error" role="alert"></p>
-      <div class="row">
-        <div class="samples" id="samples" aria-label="Try a sample"></div>
-        <div class="go">
-          <span class="hint"><kbd>Enter</kbd> to set · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span>
-          <button type="submit" class="primary" id="go">Set it</button>
-        </div>
-      </div>
-    </form>
+<main class="stage">
+  <section class="write" id="write-view">
+    <label for="input" class="sr-only">Write something</label>
+    <textarea id="input" rows="1" spellcheck="false" placeholder="Start typing. The type is listening."></textarea>
   </section>
 
-  <section class="band result" id="result" aria-live="polite" hidden>
-    <div class="pick">
-      <p class="pick-meta"><span id="pick-class"></span> · <span id="pick-source"></span></p>
-      <h2 id="pick-name"></h2>
-      <p id="pick-note" class="note"></p>
-    </div>
-    <div class="specimen-tools">
-      <label class="toggle"><input type="checkbox" id="marks" checked> Mark the words it reacted to</label>
-    </div>
-    <article id="specimen" class="specimen show-marks"></article>
-
-  </section>
-
-  <section class="band how" id="how" hidden aria-labelledby="how-title">
-    <h2 id="how-title">How it chose</h2>
-    <ol class="steps">
-      <li class="step">
-        <h3>1. Read</h3>
-        <p class="step-sub">What kind of writing this is</p>
-        <dl id="read" class="stats"></dl>
-      </li>
-      <li class="step">
-        <h3>2. Feel</h3>
-        <p class="step-sub" id="feel-sub">The emotional register</p>
-        <div id="feel" class="bars"></div>
-      </li>
-      <li class="step">
-        <h3>3. Match</h3>
-        <p class="step-sub">Why this typeface answers it</p>
-        <div id="match" class="match"></div>
-      </li>
-      <li class="step">
-        <h3>4. Set</h3>
-        <p class="step-sub">Size, leading and line length</p>
-        <dl id="set" class="stats"></dl>
-      </li>
-    </ol>
-    <details class="all" id="all" hidden>
-      <summary>All typefaces, ranked</summary>
-      <ol id="ranking" class="ranking"></ol>
-    </details>
-    <p class="method" id="method"></p>
+  <section class="read" id="read-view" hidden aria-labelledby="read-title">
+    <h2 id="read-title" class="sr-only">Reading</h2>
+    <article id="specimen" class="specimen" tabindex="0" title="Click to keep writing"></article>
+    <aside class="notes" id="notes"></aside>
   </section>
 </main>
 
-<footer class="band foot">
-  <p>Typefaces from Google Fonts, all under the SIL Open Font License.</p>
+<aside class="meters" id="meters" aria-label="Tone, live"></aside>
+
+<footer class="hud bottom">
+  <p class="status" id="status" aria-live="polite"></p>
+  <p class="keys" id="keys"></p>
 </footer>
 
 <script type="module" src="src/app.js"></script>

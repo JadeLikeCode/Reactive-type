@@ -1,28 +1,67 @@
-import { analyze, lookup } from './analyze.js';
+// Reactive Type
+// Two speeds: a fast local reading reacts on every keystroke;
+// Enter asks Claude (or the offline rules) for a considered reading.
+
+import { analyze } from './analyze.js';
 import { recommend, setting } from './recommend.js';
 import { DIMENSIONS } from './lexicon.js';
+import { FONTS } from './fonts.js';
 import { WORKER_URL } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pct = (x) => Math.round(Math.max(0, Math.min(1, Number(x) || 0)) * 100);
-
-const SAMPLES = {
-  'A short story': `The morning after the storm, my grandmother walked down to the shore. She had lived in the house for sixty years and knew every sound it made. The sea was quiet and strangely bright, and she stood there a long time, remembering the boats that never came back.\n\n"They always said the water forgives," she told me later, "but it doesn't forget."`,
-  'A hard text': `I don't know how to say this... I keep thinking about the last time we were together and how empty it felt. I miss you, but I think we're already gone.`,
-  'A product launch': `Introducing Flow, the new way to plan your week! Get started free today and discover how good it feels to finally be on top of everything. Join 10,000 teams now.`,
-  'Lab steps': `1. Measure 50 ml of the sample into a clean beaker.\n2. Heat to 60 °C and stir for 5 minutes.\n3. Record the temperature every 30 seconds.\n4. Repeat the procedure with the second sample and compare the data.`,
-  'A suspense scene': `The footsteps stopped outside the door. Silence. Then a whisper, so close it was almost inside her. She held her breath in the dark and waited... something was wrong.`,
-  'A birthday note': `Happy birthday, sweetheart!! Hope your day is full of cake, silly dancing and everyone who loves you. Can't wait to celebrate this weekend, haha!`,
-  'A formal letter': `Dear members of the committee,\n\nI am writing regarding the proposal submitted last quarter. Furthermore, we respectfully request that the board review the attached policy prior to the fiscal year deadline.\n\nSincerely,\nThe operations team`,
-};
+const clamp01 = (x) => Math.max(0, Math.min(1, Number(x) || 0));
+const root = document.documentElement.style;
+const body = document.body;
+const input = $('input');
 
 const INTENT_LABEL = {
-  story: 'Narrative', poem: 'Poetic / lyrical', personal: 'Personal message', formal: 'Formal writing',
-  instructional: 'Instructions', marketing: 'Promotional copy', general: 'General prose',
+  story: 'narrative', poem: 'lyrical', personal: 'personal message', formal: 'formal writing',
+  instructional: 'instructions', marketing: 'promotional copy', general: 'general prose',
 };
 
-// ---------- Fonts: try the rich request, fall back to the plain family, so nothing can break.
+// ---------------------------------------------------------------- mood fields
+// Each tone owns a field: a base colour and three glows. The live field is a
+// weighted blend of all of them, so the background drifts as the tone drifts.
+const FIELDS = {
+  neutral:    { base: '#101114', g: ['#2b3140', '#1c2a2a', '#24202e'], accent: '#9ad0ff' },
+  warmth:     { base: '#2a120c', g: ['#ff6a3d', '#ffb070', '#c2410c'], accent: '#ffd2a8' },
+  joy:        { base: '#f3ecdc', g: ['#ffcf3f', '#ff7ac6', '#7ee0ff'], accent: '#d6336c' },
+  melancholy: { base: '#0c1320', g: ['#3b5a8a', '#6f7f99', '#1e2f4d'], accent: '#a9c1e8' },
+  intensity:  { base: '#1c0505', g: ['#ff2a1a', '#ff8a00', '#8a0d0d'], accent: '#ffd166' },
+  tension:    { base: '#040605', g: ['#1f7a4a', '#0d2a1d', '#3a1d1d'], accent: '#62ff9d' },
+  wonder:     { base: '#0b0a24', g: ['#7b5cff', '#38d1ff', '#ff8be0'], accent: '#c7b8ff' },
+  gravity:    { base: '#17150f', g: ['#8a7a55', '#3a3428', '#5b4a2e'], accent: '#e3d3a8' },
+  formality:  { base: '#ebeae5', g: ['#c9ccd6', '#9aa3b5', '#e2dccd'], accent: '#3446a3' },
+  technical:  { base: '#071016', g: ['#00b8e6', '#2a5cff', '#0b3a4a'], accent: '#00e1ff' },
+};
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const gam = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+const toHex = (rgb) => '#' + rgb.map((c) => Math.round(clamp01(gam(c)) * 255).toString(16).padStart(2, '0')).join('');
+function mix(cols, ws) {
+  const out = [0, 0, 0];
+  cols.forEach((c, i) => hex(c).forEach((v, j) => { out[j] += lin(v) * ws[i]; }));
+  return out;
+}
+
+function applyField(tone) {
+  const keys = Object.keys(FIELDS);
+  const raw = keys.map((k) => (k === 'neutral' ? 0.12 : clamp01(tone?.[k]) ** 2.2));
+  const sum = raw.reduce((a, b) => a + b, 0);
+  const w = raw.map((x) => x / sum);
+  const base = mix(keys.map((k) => FIELDS[k].base), w);
+  const lum = 0.2126 * base[0] + 0.7152 * base[1] + 0.0722 * base[2];
+  root.setProperty('--base', toHex(base));
+  root.setProperty('--ink', lum > 0.35 ? '#141416' : '#f1efe9');
+  [0, 1, 2].forEach((i) => root.setProperty(`--g${i + 1}`, toHex(mix(keys.map((k) => FIELDS[k].g[i]), w))));
+  // Accent follows the strongest tone, so it stays a real colour rather than a muddy average.
+  const top = keys[w.indexOf(Math.max(...w))];
+  root.setProperty('--accent', FIELDS[top].accent);
+  body.toggleAttribute('data-pulse', Math.max(...raw.slice(1)) > 0.5);
+}
+
+// ---------------------------------------------------------------- fonts
 let POOL = [];
 const poolReady = fetch('pool.json').then((r) => r.json()).then((p) => { POOL = p; }).catch(() => {});
 const loaded = new Map();
@@ -31,122 +70,178 @@ function loadFont(f) {
   const n = f.name.replace(/ /g, '+');
   const tries = [f.q, `${n}:ital,wght@0,400;0,700;1,400`, `${n}:wght@400;700`, n].filter(Boolean);
   const attempt = (i) => new Promise((resolve) => {
-    if (i >= tries.length) return resolve();
+    if (i >= tries.length) return resolve(false);
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = `https://fonts.googleapis.com/css2?family=${tries[i]}&display=swap`;
-    link.onload = () => document.fonts.load(`400 20px "${f.name}"`).then(resolve, resolve);
+    link.onload = () => document.fonts.load(`400 24px "${f.name}"`).then(() => resolve(true), () => resolve(true));
     link.onerror = () => { link.remove(); attempt(i + 1).then(resolve); };
     document.head.appendChild(link);
-    setTimeout(resolve, 3000);
   });
-  const p = attempt(0);
+  const p = Promise.race([attempt(0), new Promise((r) => setTimeout(() => r(true), 3500))]);
   loaded.set(f.name, p);
   return p;
 }
 const stack = (f) => `"${f.name}", ${/mono|typewriter/i.test(f.cls) ? 'ui-monospace, monospace' : /sans|grotesque|grotesk|gothic|geometric/i.test(f.cls) ? 'system-ui, sans-serif' : /hand/i.test(f.cls) ? 'cursive' : 'Georgia, serif'}`;
+const lower = (s) => s.toLowerCase();
 
-// ---------- Composer
-const input = $('input');
-$('samples').innerHTML = Object.keys(SAMPLES).map((k) => `<button type="button" data-k="${esc(k)}">${esc(k)}</button>`).join('');
-$('samples').addEventListener('click', (e) => {
-  const b = e.target.closest('button'); if (!b) return;
-  input.value = SAMPLES[b.dataset.k];
-  run();
-});
-input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); run(); }
-});
-input.addEventListener('input', () => { $('error').textContent = ''; try { localStorage.setItem('emotive-draft', input.value); } catch {} });
-$('form').addEventListener('submit', (e) => { e.preventDefault(); run(); });
-$('marks').addEventListener('change', () => $('specimen').classList.toggle('show-marks', $('marks').checked));
-
-let busy = false;
-async function run() {
-  if (busy) return;
-  const text = input.value.trim();
-  if ((text.match(/[A-Za-z']+/g) || []).length < 3) {
-    $('error').textContent = 'Write at least a sentence so there is something to read.'; input.focus(); return;
-  }
-  busy = true; $('go').textContent = 'Reading…'; $('specimen').classList.add('loading');
-  const a = analyze(text);
-  let view = null, note = '';
-  if (WORKER_URL) {
-    try {
-      await poolReady;
-      view = await fromClaude(text, a);
-    } catch (err) {
-      note = 'Claude could not be reached, so this reading uses the offline rules.';
-      console.warn(err);
-    }
-  }
-  if (!view) view = fromRules(a, note);
-  await render(view);
-  busy = false; $('go').textContent = 'Set it';
+function applyFace(f, set) {
+  root.setProperty('--face', f ? stack(f) : 'var(--mono)');
+  root.setProperty('--fvs', f?.fvs || 'normal');
+  root.setProperty('--weight', set?.weight || 400);
+  $('face-name').textContent = f ? lower(f.name) : 'departure mono';
+  $('face-class').textContent = f ? `/ ${lower(f.cls)}` : '/ waiting for tone';
 }
 
-// ---------- Two readers, one view
+// Size and measure follow length; the writing never gets cramped.
+function applyScale(words) {
+  const size = words < 12 ? 'clamp(30px, 4.6vw, 60px)' : words < 40 ? 'clamp(26px, 3.4vw, 46px)'
+    : words < 120 ? 'clamp(21px, 2.3vw, 32px)' : 'clamp(18px, 1.6vw, 22px)';
+  const measure = words < 12 ? '18ch' : words < 40 ? '24ch' : words < 120 ? '34ch' : '62ch';
+  root.setProperty('--size', size);
+  root.setProperty('--measure', measure);
+  root.setProperty('--lead', words < 40 ? 1.18 : words < 120 ? 1.35 : 1.6);
+}
+
+// ---------------------------------------------------------------- meters
+function renderMeters(tone, hot = []) {
+  $('meters').innerHTML = DIMENSIONS.map((d) => {
+    const v = clamp01(tone?.[d.id]);
+    const n = Math.round(v * 10);
+    return `<div class="meter${hot.includes(d.id) ? ' hot' : ''}" title="${esc(d.hint)}"><span>${esc(lower(d.label))}</span><span class="bar">${'▮'.repeat(n)}${'▯'.repeat(10 - n)}</span><span class="v">${String(Math.round(v * 100)).padStart(2, '0')}</span></div>`;
+  }).join('');
+}
+const hotOf = (tone) => Object.entries(tone).filter(([, v]) => v >= 0.25).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
+
+// ---------------------------------------------------------------- live reaction
+let current = null, currentScore = 0, liveTimer = 0;
+function grow() { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
+
+function live() {
+  const text = input.value;
+  const words = (text.match(/[A-Za-z']+/g) || []).length;
+  applyScale(words);
+  grow();
+  try { localStorage.setItem('reactive-draft', text); } catch {}
+  if (words < 3) {
+    applyField(null); renderMeters({}); swapFace(null);
+    status(words ? 'keep going…' : 'listening'); return;
+  }
+  // React to the most recent passage so the type follows the tone as it turns.
+  const recent = (text.match(/[^\s]+/g) || []).slice(-60).join(' ');
+  const a = analyze(recent);
+  const full = analyze(text);
+  const r = recommend({ ...a, lengthFactor: full.lengthFactor, lengthClass: full.lengthClass });
+  applyField(a.profile);
+  renderMeters(a.profile, hotOf(a.profile));
+  const quiet = Math.max(...Object.values(a.profile)) < 0.15;
+  const best = quiet && words < 8 ? null : r.best;
+  // Hysteresis: only change face when the new one clearly wins, so it doesn't flicker.
+  if (best && current && best.font.name !== current.name) {
+    const cur = r.ranked.find((x) => x.font.name === current.name);
+    if (cur && best.score - cur.score < 0.025) { status(`${words} words · reads as ${INTENT_LABEL[full.intent]}`); return; }
+  }
+  swapFace(best ? best.font : null, best ? setting(full, best.font) : null);
+  status(`${words} words · reads as ${INTENT_LABEL[full.intent]}`);
+}
+
+let swapId = 0;
+async function swapFace(f, set) {
+  if ((f?.name || null) === (current?.name || null)) { if (set) root.setProperty('--weight', set.weight); return; }
+  const id = ++swapId;
+  if (f) await loadFont(f);
+  if (id !== swapId) return;
+  input.classList.add('swap');
+  setTimeout(() => {
+    if (id !== swapId) return;
+    current = f;
+    applyFace(f, set);
+    grow();
+    input.classList.remove('swap');
+  }, 160);
+}
+
+// ---------------------------------------------------------------- the considered reading
+async function settle() {
+  const text = input.value.trim();
+  if ((text.match(/[A-Za-z']+/g) || []).length < 3) { status('write a sentence first'); return; }
+  const a = analyze(text);
+  setMode('reading');
+  showSpecimen(text, [], null);
+  status(WORKER_URL ? 'claude is reading…' : 'reading…');
+  let v = null, note = '';
+  if (WORKER_URL) {
+    try { await poolReady; v = await fromClaude(text, a); }
+    catch (e) { console.warn(e); note = 'Claude was unreachable, so the offline rules made this reading.'; }
+  }
+  if (!v) v = fromRules(a, note);
+  await loadFont(v.font);
+  current = v.font;
+  applyFace(v.font, v.setting);
+  root.setProperty('--size', `${v.setting.size * (a.lengthClass === 'short' ? 1.5 : 1.15)}px`);
+  root.setProperty('--lead', v.setting.leading);
+  root.setProperty('--measure', `${v.setting.measure}ch`);
+  applyField(v.tone);
+  renderMeters(v.tone, hotOf(v.tone));
+  showSpecimen(text, v.evidence, v);
+  setMode('read');
+  status(`read by ${v.source === 'ai' ? 'claude' : 'rules'} · ${v.intent}`);
+}
+
 async function fromClaude(text, a) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30000);
-  const res = await fetch(WORKER_URL, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }), signal: ctrl.signal,
-  });
-  clearTimeout(timer);
+  const t = setTimeout(() => ctrl.abort(), 30000);
+  const res = await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }), signal: ctrl.signal });
+  clearTimeout(t);
   const out = await res.json();
   if (!res.ok) throw new Error(out.error || res.status);
   const font = POOL.find((f) => f.name === out.font);
-  if (!font) throw new Error('Unknown font ' + out.font);
+  if (!font) throw new Error('unknown font ' + out.font);
   const s = out.setting;
   return {
-    source: 'ai', model: out.model, a, text, font,
-    intent: out.intent, voice: out.voice, tone: out.tone,
-    evidence: out.evidence,
-    reasoning: [out.reasoning],
+    source: 'ai', model: out.model, font, intent: lower(out.intent), voice: lower(out.voice), tone: out.tone,
+    evidence: out.evidence, reasoning: [out.reasoning],
     alternates: out.alternates.map((x) => ({ name: x.font, why: x.why_not })),
-    setting: { size: s.size_px, leading: s.leading, measure: s.measure_ch, weight: s.weight, why: s.why },
+    setting: { size: s.size_px, leading: s.leading, measure: s.measure_ch, weight: s.weight, why: s.why }, words: a.stats.words,
   };
 }
 
 function fromRules(a, note) {
   const r = recommend(a);
-  const best = r.best, f = best.font, set = setting(a, f);
+  const f = r.best.font, set = setting(a, f);
   const evidence = [];
-  for (const d of DIMENSIONS) for (const w of new Set(a.hits[d.id])) evidence.push({ phrase: w, reading: d.label });
-  const reasons = best.parts.filter((x) => a.profile[x.id] >= 0.2).sort((x, y) => y.contrib - x.contrib).slice(0, 3)
-    .map((x) => DIMENSIONS.find((d) => d.id === x.id).label.toLowerCase());
+  for (const d of DIMENSIONS) for (const w of new Set(a.hits[d.id])) evidence.push({ phrase: w, reading: lower(d.label) });
+  const traits = r.best.parts.filter((x) => a.profile[x.id] >= 0.2).sort((x, y) => y.contrib - x.contrib).slice(0, 3)
+    .map((x) => lower(DIMENSIONS.find((d) => d.id === x.id).label));
   const reasoning = [
-    reasons.length
-      ? `The text leans toward ${reasons.join(', ')}, and ${f.name}'s traits sit closest to that profile.`
-      : `No strong emotion stood out, so it favored a calm, readable face.`,
-    a.lengthClass === 'long' ? 'It is a long read, so legibility counted for more.'
-      : a.lengthClass === 'short' ? 'It is short, so character counted for more than stamina.'
-      : 'At this length, legibility and character were weighed about evenly.',
+    traits.length ? `The text leans toward ${traits.join(', ')}; ${f.name} has the closest profile.` : 'No strong tone stood out, so a calm, readable face won.',
+    { short: 'It is short, so character counted for more than stamina.', medium: 'At this length, character and legibility were weighed evenly.', long: 'It is a long read, so legibility counted for more.' }[a.lengthClass],
   ];
   if (note) reasoning.unshift(note);
   const alternates = r.ranked.slice(1, 3).map((x) => {
-    const gap = DIMENSIONS.map((d) => ({ d, g: Math.abs(a.profile[d.id] - x.font.t[d.id]) * (0.25 + a.profile[d.id]) }))
-      .sort((p, q) => q.g - p.g)[0].d.label.toLowerCase();
-    return { name: x.font.name, why: `${x.match}% match; further from the text on ${gap}.` };
+    const gap = DIMENSIONS.map((d) => ({ d, g: Math.abs(a.profile[d.id] - x.font.t[d.id]) * (0.25 + a.profile[d.id]) })).sort((p, q) => q.g - p.g)[0].d;
+    return { name: x.font.name, why: `further from the text on ${lower(gap.label)}.` };
   });
   return {
-    source: 'rules', a, text: a.text, font: f, intent: INTENT_LABEL[a.intent], voice: null, tone: a.profile,
-    evidence, reasoning, alternates, ranking: r.ranked,
-    setting: { ...set, why: { short: 'Short copy is set larger, with tighter leading.', medium: 'Medium copy at a comfortable reading size.', long: 'Long copy is set smaller, with looser leading for stamina.' }[a.lengthClass] },
+    source: 'rules', font: f, intent: INTENT_LABEL[a.intent], voice: null, tone: a.profile, evidence, reasoning, alternates,
+    setting: { ...set, why: { short: 'short copy: large, tight leading.', medium: 'medium copy: comfortable reading size.', long: 'long copy: smaller, looser leading for stamina.' }[a.lengthClass] },
+    words: a.stats.words,
   };
 }
 
-// ---------- Rendering
 function markText(text, phrases) {
   const list = [...new Set(phrases.map((p) => p.phrase).filter(Boolean))].sort((x, y) => y.length - x.length);
-  const reading = new Map(phrases.map((p) => [p.phrase.toLowerCase(), p.reading]));
+  const index = new Map();
+  phrases.forEach((p) => { if (!index.has(lower(p.phrase))) index.set(lower(p.phrase), index.size + 1); });
   const re = list.length ? new RegExp(`(?<![A-Za-z])(${list.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![A-Za-z])`, 'gi') : null;
+  const seen = new Set();
   const line = (l) => {
     if (!re) return esc(l);
     let out = '', last = 0;
     for (const m of l.matchAll(re)) {
-      out += esc(l.slice(last, m.index)) + `<mark title="${esc(reading.get(m[0].toLowerCase()) || '')}">${esc(m[0])}</mark>`;
+      const n = index.get(lower(m[0]));
+      const first = !seen.has(n); seen.add(n);
+      out += esc(l.slice(last, m.index)) + `<mark>${esc(m[0])}</mark>${first ? `<sup>${n}</sup>` : ''}`;
       last = m.index + m[0].length;
     }
     return out + esc(l.slice(last));
@@ -154,65 +249,63 @@ function markText(text, phrases) {
   return text.split(/\n{2,}/).map((p) => '<p>' + p.split('\n').map(line).join('<br>') + '</p>').join('');
 }
 
-async function render(v) {
-  const f = v.font, s = v.setting;
-  await loadFont(f);
-  const sp = $('specimen');
-  sp.innerHTML = markText(v.text, v.evidence);
-  Object.assign(sp.style, {
-    fontFamily: stack(f), fontSize: s.size + 'px', lineHeight: s.leading, fontWeight: s.weight,
-    fontVariationSettings: f.fvs || 'normal',
-  });
-  sp.style.setProperty('--measure', s.measure + 'ch');
-  sp.classList.remove('loading');
-
-  $('pick-name').textContent = f.name;
-  $('pick-name').style.fontFamily = stack(f);
-  $('pick-name').style.fontVariationSettings = f.fvs || 'normal';
-  $('pick-class').textContent = f.cls;
-  $('pick-source').textContent = v.source === 'ai' ? 'Read by Claude' : 'Read by rules';
-  $('pick-note').textContent = f.note;
-
-  // 1. Read
-  const st = v.a.stats;
-  const rows = [['Reads as', v.intent], ...(v.voice ? [['Voice', v.voice]] : []),
-    ['Words', st.words], ['Sentences', st.sentences], ['Avg. sentence', `${st.avgSentence} words`], ['Length', v.a.lengthClass]];
-  $('read').innerHTML = rows.map(([k, val]) => `<dt>${esc(k)}</dt><dd>${esc(val)}</dd>`).join('');
-
-  // 2. Feel
-  const top = Object.entries(v.tone).sort((x, y) => y[1] - x[1]).slice(0, 2).map(([k]) => k);
-  $('feel-sub').textContent = v.source === 'ai' ? 'The emotional register, as Claude read it' : 'From word choice and punctuation';
-  const ev = v.source === 'ai' && v.evidence.length
-    ? `<ul class="evidence">${v.evidence.map((e) => `<li><q>${esc(e.phrase)}</q> ${esc(e.reading)}</li>`).join('')}</ul>` : '';
-  $('feel').innerHTML = DIMENSIONS.map((d) => {
-    const val = v.tone[d.id];
-    const words = v.source === 'rules' ? [...new Set(v.a.hits[d.id])].slice(0, 6) : [];
-    return `<div class="bar${top.includes(d.id) && val >= 0.2 ? ' hot' : ''}" title="${esc(d.hint)}">
-      <span>${esc(d.label)}</span><span class="bar-track"><span class="bar-fill" style="width:${pct(val)}%"></span></span>
-      <span class="bar-val">${pct(val)}</span>${words.length ? `<span class="words">${words.map(esc).join(', ')}</span>` : ''}</div>`;
-  }).join('') + ev;
-
-  // 3. Match
-  $('match').innerHTML = v.reasoning.map((p) => `<p>${esc(p)}</p>`).join('') +
-    (v.alternates.length ? `<p class="also">Also considered</p><ul class="alts-list">${v.alternates.map((x) => `<li><b>${esc(x.name)}</b> ${esc(x.why)}</li>`).join('')}</ul>` : '');
-
-  // 4. Set
-  $('set').innerHTML = [['Size', `${s.size}px`], ['Leading', s.leading], ['Line length', `${s.measure} characters`], ['Weight', s.weight]]
-    .map(([k, val]) => `<dt>${esc(k)}</dt><dd>${esc(val)}</dd>`).join('') + `<dt class="set-why">${esc(s.why)}</dt>`;
-
-  $('all').hidden = v.source !== 'rules';
-  if (v.ranking) $('ranking').innerHTML = v.ranking.map((x) => `<li>${esc(x.font.name)} <span>${x.match}%</span></li>`).join('');
-  $('method').textContent = v.source === 'ai'
-    ? `Claude${v.model ? ` (${v.model})` : ''} read the text and chose from a curated pool of ${POOL.length} Google Fonts. The marked words are the ones it pointed to.`
-    : 'Offline mode: a hand-written tone lexicon plus punctuation and structure signals, compared with typeface traits a designer assigned to 21 faces.';
-
-  $('result').hidden = false; $('how').hidden = false;
+function showSpecimen(text, evidence, v) {
+  // In rules mode the word list can be long; number only the first few.
+  const ev = v?.source === 'rules' ? evidence.slice(0, 6) : evidence;
+  $('specimen').innerHTML = markText(text, ev);
+  if (!v) { $('notes').innerHTML = ''; return; }
+  const s = v.setting;
+  $('notes').innerHTML = `
+    <section><h3>face</h3><p class="face">${esc(v.font.name)}</p><p class="r">${esc(lower(v.font.cls))} · ${esc(v.font.note)}</p></section>
+    <section><h3>reads as</h3><p>${esc(v.intent)}${v.voice ? ` <span class="r">· ${esc(v.voice)}</span>` : ''}</p></section>
+    ${ev.length ? `<section><h3>signals</h3><ol>${ev.map((e) => `<li><span><q>${esc(e.phrase)}</q> <span class="r">→ ${esc(lower(e.reading))}</span></span></li>`).join('')}</ol></section>` : ''}
+    <section><h3>why</h3>${v.reasoning.map((p) => `<p>${esc(p)}</p>`).join('')}</section>
+    ${v.alternates.length ? `<section><h3>also considered</h3><ul>${v.alternates.map((x) => `<li>${esc(x.name)} <span class="r">— ${esc(x.why)}</span></li>`).join('')}</ul></section>` : ''}
+    <section><h3>set</h3><dl><dt>size</dt><dd>${s.size}px</dd><dt>leading</dt><dd>${s.leading}</dd><dt>measure</dt><dd>${s.measure}ch</dd><dt>weight</dt><dd>${s.weight}</dd></dl><p class="r" style="margin-top:6px">${esc(lower(s.why))}</p></section>
+    <section><p class="r">${v.source === 'ai' ? `claude${v.model ? ` (${esc(v.model)})` : ''} chose from ${POOL.length} typefaces.` : `offline rules · 20 hand-scored faces.`}</p></section>`;
 }
 
-// ---------- Start mid-use: restore a draft or show the sample
+// ---------------------------------------------------------------- modes, keys, status
+function status(t) { $('status').textContent = `> ${t}`; }
+function setMode(m) {
+  body.dataset.mode = m;
+  const writing = m === 'write';
+  $('write-view').hidden = !writing;
+  $('read-view').hidden = writing;
+  const enter = '<kbd>enter</kbd>';
+  $('keys').innerHTML = writing
+    ? `${enter} read deeply · <kbd>shift</kbd>+${enter} new line`
+    : m === 'reading' ? 'reading…' : `<kbd>esc</kbd> keep writing · <button type="button" id="edit">edit</button>`;
+  $('edit')?.addEventListener('click', backToWriting);
+}
+function backToWriting() {
+  setMode('write');
+  live();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+input.addEventListener('input', () => { clearTimeout(liveTimer); liveTimer = setTimeout(live, 140); grow(); });
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); settle(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (body.dataset.mode !== 'read') return;
+  if (e.key === 'Escape' || (e.key.length === 1 && !e.metaKey && !e.ctrlKey)) backToWriting();
+});
+$('specimen').addEventListener('click', backToWriting);
+
+// Warm the offline faces so live swaps are instant.
+const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));
+idle(() => FONTS.forEach((f, i) => setTimeout(() => loadFont(f), i * 120)));
+
+// Start: restore a draft if there is one, otherwise an empty, listening screen.
 {
   let draft = '';
-  try { draft = localStorage.getItem('emotive-draft') || ''; } catch {}
-  input.value = draft.trim() ? draft : SAMPLES['A short story'];
-  run();
+  try { draft = localStorage.getItem('reactive-draft') || ''; } catch {}
+  input.value = draft;
+  setMode('write');
+  applyField(null); renderMeters({});
+  live();
+  input.focus();
 }
