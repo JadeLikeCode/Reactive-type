@@ -126,7 +126,13 @@ const hotOf = (tone) => Object.entries(tone).filter(([, v]) => v >= 0.25).sort((
 
 // ---------------------------------------------------------------- live reaction
 let current = null, baseWeight = 400, lastSwap = 0, frame = 0;
-function grow() { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
+// The mirror carries the same text (or the placeholder) in the same type, and sizes the field.
+function grow() {
+  if (body.dataset.mode === 'set') return; // the marked copy is already in place
+  const empty = !input.value;
+  $('surface').classList.toggle('empty', empty);
+  $('mirror').textContent = (empty ? input.placeholder : input.value) + ' ';
+}
 
 function live() {
   frame = 0;
@@ -309,10 +315,7 @@ input.addEventListener('input', () => {
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); settle(); }
 });
-window.addEventListener('resize', grow);
-// Re-measure whenever the type changes size under us: font files landing, size easing in.
-input.addEventListener('transitionend', grow);
-document.fonts.addEventListener?.('loadingdone', grow);
+
 
 // Warm the offline faces so live swaps are instant.
 const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));
