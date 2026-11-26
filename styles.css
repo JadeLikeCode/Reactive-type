@@ -51,13 +51,26 @@ kbd{font:inherit;border:1px solid var(--line);border-radius:3px;padding:0 5px;co
 .hud button:hover{background:color-mix(in srgb,var(--ink) 16%,transparent)}
 
 /* ---- meters */
-.meters{position:fixed;left:max(3vw,16px);top:50%;transform:translateY(-50%);z-index:2;display:grid;gap:3px;font-size:12px;color:var(--dim)}
-.meter{display:grid;grid-template-columns:13ch auto 3ch;gap:8px;white-space:pre;transition:color .4s}
+.meters{position:fixed;left:max(3vw,16px);top:50%;transform:translateY(-50%);z-index:2;display:grid;gap:6px;font-size:12px;color:var(--dim)}
+.meter{display:grid;grid-template-columns:11ch 12ch 3ch 6ch;gap:10px;align-items:center;white-space:nowrap;transition:color .25s}
 .meter.hot{color:var(--ink)}
-.meter.lean span:first-child{color:var(--accent)}
-.meter.lean span:first-child::after{content:" ←";animation:blink 1s steps(1) infinite}
-.meter .v{text-align:right}
-.meter.mood{grid-template-columns:13ch auto 6ch;margin-bottom:8px}
+.meter .v{text-align:right;font-variant-numeric:tabular-nums}
+.meter .lvl{color:var(--accent)}
+.track{position:relative;height:5px;background:color-mix(in srgb,var(--ink) 12%,transparent);overflow:hidden}
+.track i{position:absolute;left:0;top:0;bottom:0;display:block}
+.track .fill{background:var(--ink);opacity:.5;transition:width .22s cubic-bezier(.2,.8,.2,1),background-color .25s,opacity .25s}
+.track .ghost{background:var(--ink);opacity:.14;transition:width 1.4s ease-out}
+.meter.hot .fill{background:var(--accent);opacity:1}
+.meter.up .v,.meter.up .name{animation:flash-up .5s ease-out}
+.meter.down .v{animation:flash-down .5s ease-out}
+@keyframes flash-up{0%{color:var(--accent);text-shadow:0 0 8px var(--accent)}}
+@keyframes flash-down{0%{opacity:.35}}
+.meter.lean .name{color:var(--accent)}
+.meter.lean .name::after{content:" ←";animation:blink 1s steps(1) infinite}
+.meter.mood{margin-bottom:8px}
+.track.bi{overflow:visible;background:linear-gradient(90deg,color-mix(in srgb,var(--ink) 22%,transparent),color-mix(in srgb,var(--ink) 6%,transparent) 50%,color-mix(in srgb,var(--ink) 22%,transparent))}
+.track.bi .mid{left:50%;width:1px;top:-3px;bottom:-3px;background:var(--dim)}
+.track.bi .dot{left:50%;width:9px;height:9px;top:-2px;margin-left:-4px;background:var(--accent);border-radius:50%;transition:left .3s cubic-bezier(.2,.8,.2,1)}
 
 /* ---- stage: one writing surface; notes appear beside it without moving it */
 [hidden]{display:none!important}
@@ -101,7 +114,7 @@ body[data-mode=set] .notes{opacity:1;visibility:visible;transform:none;transitio
   .stage{padding:88px max(5vw,16px) 140px}
   .meters{position:static;transform:none;margin:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 14px;font-size:11px;
     position:fixed;left:0;right:0;top:auto;bottom:44px;padding:0 max(5vw,16px)}
-  .meter{grid-template-columns:auto 1fr}.meter .bar{display:none}
+  .meter{grid-template-columns:auto 1fr}.meter .track,.meter .lvl{display:none}
   .stage{grid-template-columns:minmax(0,1fr);align-content:center}
   .notes{border-left:0;border-top:1px solid var(--line);padding:16px 0 0;align-self:start}
   body:not([data-mode=set]) .notes{display:none}

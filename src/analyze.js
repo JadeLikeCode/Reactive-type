@@ -9,7 +9,10 @@ const TURNS = new Set(['but', 'however', 'nevermind', 'although', 'though', 'yet
 // Family words say who a message is for, not how it feels: half weight.
 const KIN = new Set(['mother', 'mom', 'mum', 'father', 'dad', 'family', 'grandma', 'grandmother', 'grandpa', 'baby', 'friend']);
 
+// A few words VADER leaves out or underweights.
+const EXTRA = { died: -2.6, dead: -2.6, dying: -2.6, funeral: -2.2, buried: -1.8, passed: 0, killed: -3 };
 function valenceOf(w) {
+  if (w in EXTRA) return EXTRA[w];
   if (w in VALENCE) return VALENCE[w];
   const s = stem(w);
   if (s in VALENCE) return VALENCE[s];
@@ -53,6 +56,8 @@ function readTokens(tokens, weightAt, skipLast = false) {
     let v = valenceOf(t);
     if (negatedHere) v = -v * 0.7;
     if (v > 0) pos += w * v * v; else if (v < 0) neg += w * v * v;
+    // Strength: "furious" counts more than "annoyed"; plain lexicon words sit in between.
+    const strength = v ? 0.5 + Math.min(4, Math.abs(v)) / 5 : 0.75;
     if (dim) {
       if (negatedHere && dim !== 'formality' && dim !== 'technical') {
         negated.push(t);
@@ -60,11 +65,11 @@ function readTokens(tokens, weightAt, skipLast = false) {
         if (dim === 'joy' || dim === 'warmth') { acc.melancholy += w * 0.6; hits.melancholy.push(`not ${t}`); }
         return;
       }
-      acc[dim] += w * (KIN.has(t) ? 0.5 : 1);
+      acc[dim] += w * strength * (KIN.has(t) ? 0.5 : 1);
       hits[dim].push(t);
     } else if (Math.abs(v) >= 1.5) {
       const d = dimForValence(v, t, tokens, i);
-      acc[d] += w * 0.85;
+      acc[d] += w * strength;
       hits[d].push(negatedHere ? `not ${t}` : t);
     }
   });
@@ -206,7 +211,10 @@ export function lean(text, halfLife = 10) {
   const tokens = text.toLowerCase().match(/[a-z']+/g) || [];
   const typing = /[a-z']$/i.test(text);
   const n = tokens.length;
-  const read = readTokens(tokens, (i) => Math.pow(0.5, (n - 1 - i) / halfLife), typing);
+  // The sentence you're on (or just finished) speaks loudest: "...a golden frog. The frog died."
+  const sentences = text.split(/(?<=[.!?…])\s+/).filter((x) => /[a-z]/i.test(x));
+  const lastCount = (sentences.at(-1)?.toLowerCase().match(/[a-z']+/g) || []).length;
+  const read = readTokens(tokens, (i) => Math.pow(0.5, (n - 1 - i) / halfLife) * (i >= n - lastCount ? 1.8 : 1), typing);
   const { acc, wsum } = read;
 
   let predicted = null;
@@ -234,17 +242,17 @@ export function lean(text, halfLife = 10) {
   const ex = (tail.match(/!/g) || []).length, el = (tail.match(/\.\.\.|…/g) || []).length;
   const caps = (tail.match(/\b[A-Z]{3,}\b/g) || []).length, q = (tail.match(/\?/g) || []).length;
   const dens = (d) => (acc[d] / Math.max(wsum, 1)) * 100;
-  const K = 0.14;
+  const K = 0.045;
   const recent = analyze(text.slice(-500));
   const p = {
     warmth: squash(dens('warmth'), K),
-    joy: squash(dens('joy') + (acc.joy ? per(ex) * 0.5 : 0), K),
+    joy: squash(dens('joy') + (acc.joy ? per(ex) * 0.6 : 0), K),
     melancholy: squash(dens('melancholy') + per(el) * 1.2, K),
-    intensity: squash(dens('intensity') + per(ex) * 0.9 + per(caps) * 2.2, K),
+    intensity: squash(dens('intensity') + per(ex) * 0.8 + per(caps) * 2.4, K),
     tension: squash(dens('tension') + per(el) * 0.6 + per(q) * 0.3, K),
     wonder: Math.max(squash(dens('wonder'), K), recent.profile.wonder * 0.8),
-    gravity: squash(dens('gravity'), K * 1.2),
-    formality: Math.max(squash(dens('formality'), K * 1.4), analyze(text.slice(-600)).profile.formality * 0.9),
+    gravity: squash(dens('gravity'), K * 1.1),
+    formality: Math.max(squash(dens('formality'), K * 1.3), analyze(text.slice(-600)).profile.formality * 0.9),
     technical: Math.max(squash(dens('technical'), K), analyze(text.slice(-400)).profile.technical * 0.9),
   };
   balance(p, read.valence);

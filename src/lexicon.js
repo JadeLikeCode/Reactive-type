@@ -25,9 +25,11 @@ const words = {
   melancholy: `sad sadness sorrow grief grieve mourn loss lost lonely alone empty miss missing tears tear
     cry cried weep ache longing gone goodbye farewell regret remember memory memories faded fade quiet
     gray grey rain autumn winter ash hollow broken heartbreak heartbroken anymore tired exhausted
-    leaving numb hurt hurts pain devastated disappointed disappointing heavy`,
+    leaving numb hurt hurts pain devastated disappointed disappointing heavy die died dying dead funeral
+    passed buried`,
   intensity: `angry anger rage furious fury hate hated scream shout yell fight fighting war attack
-    destroy burn burning fire explode explosion urgent immediately demand enough stop furious promised betray betrayed liar
+    destroy burn burning fire explode explosion urgent immediately demand enough stop furious annoyed irritated frustrated
+    mad upset livid promised betray betrayed liar
     power powerful force fast faster crash smash break bold fierce wild loud`,
   tension: `fear afraid scared terror terrified dread anxious anxiety nervous panic dark darkness shadow
     shadows creep creeping whisper silence silent footsteps door locked blood scream knife suddenly
@@ -35,7 +37,7 @@ const words = {
   wonder: `sky sea ocean moon stars star light glow shimmer dream dreams dreaming wonder wander forest
     river mountain dawn dusk twilight morning evening golden silver mist bloom petal flower wind wings
     endless infinite magic ancient horizon breath song sing`,
-  gravity: `death die died dying life history historic duty honor honour responsibility justice law
+  gravity: `death life history historic duty honor honour responsibility justice law
     nation war sacrifice memorial legacy solemn truth serious crisis grave witness generation
     century government rights freedom`,
   formality: `regarding pursuant hereby accordingly therefore furthermore moreover sincerely respectfully

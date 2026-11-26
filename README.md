@@ -31,6 +31,17 @@ GitHub Pages is public, so the API key lives in a tiny Cloudflare Worker (free t
 
 `MODEL` in `wrangler.toml` picks the model: `claude-sonnet-5-5` reads with more nuance, while `claude-haiku-5-5` is faster and cheaper. The Worker forces a structured answer, restricts the choice to fonts in `pool.json`, and drops any quoted evidence that isn't actually in the text.
 
+## How the face is chosen
+
+Live and Enter make **one** decision, so the face you watch while typing is the face that gets set.
+
+1. **Read the tone** (below): nine tones plus an overall mood from dark to bright. Your newest words, and the sentence you're on, count most.
+2. **Pick the level.** The strongest tone's score picks a tier: **light** (under 42), **mid** (42–72) or **strong** (72+). Word strength matters: *annoyed* is mid, *furious, stop lying!* is strong.
+3. **Pick within the tier.** Each level holds two to four faces from the 79-face pool (`src/curate.js`). The undertone, the mood and the text's opening words choose among them, so different texts in the same mood get different faces, while one text holds steady as you type.
+4. **Guardrails.** Faces that are wrong for the kind of writing are skipped (no handwriting for a formal letter, no novelty face for instructions). Long texts step down a level so the face can carry paragraphs. A small hold stops flicker near a boundary, and it lets go the moment the mood flips.
+
+Edit the tiers in `src/curate.js` to change its taste.
+
 ## How the offline rules work
 
 1. **Read.** It counts words, sentences, average sentence and word length, exclamations, questions, ellipses, contractions, numbers, imperative sentences and line breaks.
@@ -63,6 +74,7 @@ styles.css        styles
 pool.json         the 80-font pool Claude chooses from
 worker/           Cloudflare Worker that holds the API key and asks Claude
 src/config.js     your Worker URL
+src/curate.js     the curated light / mid / strong tiers for each tone
 src/lexicon.js    tone dimensions and word lists
 src/valence.js    VADER word valence (MIT), positive and negative weights
 src/analyze.js    text → tone profile, intent, length, evidence

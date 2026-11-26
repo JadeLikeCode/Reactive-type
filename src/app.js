@@ -7,6 +7,7 @@ import { recommend, setting } from './recommend.js';
 import { DIMENSIONS } from './lexicon.js';
 import { FONTS } from './fonts.js';
 import { WORKER_URL } from './config.js';
+import { curate, TIERS } from './curate.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -52,7 +53,12 @@ function applyField(tone) {
   const raw = keys.map((k) => (k === 'neutral' ? 0.035 : clamp01(tone?.[k]) ** 3));
   const sum = raw.reduce((a, b) => a + b, 0);
   const w = raw.map((x) => x / sum);
-  const base = mix(keys.map((k) => FIELDS[k].base), w);
+  const light = (k) => { const b = hex(FIELDS[k].base); return 0.2126 * lin(b[0]) + 0.7152 * lin(b[1]) + 0.0722 * lin(b[2]) > 0.3; };
+  const lead = keys[w.indexOf(Math.max(...w))];
+  // Only moods on the leader's side of light/dark shape the ground; the rest show up in the glows.
+  const bw = keys.map((k, i) => (light(k) === light(lead) ? w[i] : 0));
+  const bs = bw.reduce((a, b) => a + b, 0) || 1;
+  const base = mix(keys.map((k) => FIELDS[k].base), bw.map((x) => x / bs));
   const lum = 0.2126 * base[0] + 0.7152 * base[1] + 0.0722 * base[2];
   root.setProperty('--base', toHex(base));
   root.setProperty('--ink', lum > 0.3 ? '#141416' : '#f3f1ec');
@@ -115,25 +121,54 @@ function applyScale(words) {
 }
 
 // ---------------------------------------------------------------- meters
-function renderMeters(tone, hot = [], leaning = null, valence = null) {
-  // Mood: one bipolar meter, negative on the left, positive on the right.
-  let mood = '';
+const prevTone = {};
+function buildMeters() {
+  $('meters').innerHTML =
+    `<div class="meter mood" id="m-mood" title="Overall direction: dark to bright"><span>mood</span><span class="track bi"><i class="mid"></i><i class="dot"></i></span><span class="v"></span><span class="lvl"></span></div>` +
+    DIMENSIONS.map((d) => `<div class="meter" id="m-${d.id}" title="${esc(d.hint)}"><span class="name">${esc(lower(d.label))}</span><span class="track"><i class="ghost"></i><i class="fill"></i></span><span class="v">00</span><span class="lvl"></span></div>`).join('');
+}
+function renderMeters(tone, hot = [], leaning = null, valence = null, pick = null) {
+  if (!$('m-mood')) buildMeters();
+  const mood = $('m-mood');
+  mood.style.visibility = valence == null ? 'hidden' : 'visible';
   if (valence != null) {
-    const pos = Math.round((clamp01((valence + 1) / 2)) * 10);
-    const bar = [...'▯▯▯▯▯▯▯▯▯▯▯'].map((c, i) => (i === pos ? '◆' : i === 5 ? '┃' : c)).join('');
-    const label = valence < -0.15 ? 'dark' : valence > 0.15 ? 'bright' : 'even';
-    mood = `<div class="meter mood${Math.abs(valence) > 0.3 ? ' hot' : ''}" title="Overall direction: negative to positive"><span>mood</span><span class="bar">${bar}</span><span class="v">${label}</span></div>`;
+    mood.querySelector('.dot').style.left = `${clamp01((valence + 1) / 2) * 100}%`;
+    mood.querySelector('.v').textContent = valence < -0.15 ? 'dark' : valence > 0.15 ? 'bright' : 'even';
+    mood.classList.toggle('hot', Math.abs(valence) > 0.3);
   }
-  $('meters').innerHTML = mood + DIMENSIONS.map((d) => {
-    const v = clamp01(tone?.[d.id]);
-    const n = Math.round(v * 10);
-    return `<div class="meter${hot.includes(d.id) ? ' hot' : ''}${leaning === d.id ? ' lean' : ''}" title="${esc(d.hint)}"><span>${esc(lower(d.label))}</span><span class="bar">${'▮'.repeat(n)}${'▯'.repeat(10 - n)}</span><span class="v">${String(Math.round(v * 100)).padStart(2, '0')}</span></div>`;
-  }).join('');
+  for (const d of DIMENSIONS) {
+    const row = $(`m-${d.id}`), v = clamp01(tone?.[d.id]), before = prevTone[d.id] ?? 0;
+    row.querySelector('.fill').style.width = `${v * 100}%`;
+    row.querySelector('.ghost').style.width = `${Math.max(v, before) * 100}%`;
+    row.querySelector('.v').textContent = String(Math.round(v * 100)).padStart(2, '0');
+    row.classList.toggle('hot', hot.includes(d.id));
+    row.classList.toggle('lean', leaning === d.id);
+    row.querySelector('.lvl').textContent = pick && pick.dim === d.id ? pick.level : '';
+    if (Math.abs(v - before) > 0.04) {
+      row.classList.remove('up', 'down'); void row.offsetWidth;
+      row.classList.add(v > before ? 'up' : 'down');
+    }
+    prevTone[d.id] = v;
+  }
 }
 const hotOf = (tone) => Object.entries(tone).filter(([, v]) => v >= 0.25).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
 
 // ---------------------------------------------------------------- live reaction
-let current = null, baseWeight = 400, lastSwap = 0, frame = 0;
+let current = null, baseWeight = 400, lastSwap = 0, frame = 0, lastPick = null;
+const seedOf = (text) => (text.toLowerCase().match(/[a-z']+/g) || []).slice(0, 3).join(' ');
+const byName = (n) => POOL.find((f) => f.name === n);
+
+// One decision for live and Enter: the curated tier pick for the current reading.
+function choose(text, L, full) {
+  const words = full.stats.words;
+  if (POOL.length) {
+    const pick = curate(L.profile, { valence: L.valence, intent: full.intent, words, seed: seedOf(text), prev: lastPick });
+    const font = byName(pick.name);
+    if (font) return { pick, font };
+  }
+  const r = recommend({ ...full, profile: L.profile, valence: L.valence });
+  return { pick: null, font: r.best.font };
+}
 // The mirror carries the same text (or the placeholder) in the same type, and sizes the field.
 function grow() {
   if (body.dataset.mode === 'set') return; // the marked copy is already in place
@@ -155,22 +190,20 @@ function live() {
   }
   const L = lean(text);
   const full = analyze(text);
-  const r = recommend({ ...full, profile: L.profile, valence: L.valence });
   applyField(L.profile);
-  renderMeters(L.profile, hotOf(L.profile), L.predicted?.dim, L.valence);
   const lean_ = L.predicted && !L.predicted.done ? ` · leaning → ${lower(DIMENSIONS.find((d) => d.id === L.predicted.dim).label)} (${L.predicted.word}?)` : '';
   status(`${words} words · ${INTENT_LABEL[full.intent]}${lean_}`);
   const quiet = Math.max(...Object.values(L.profile)) < 0.12;
-  const best = quiet && words < 6 ? null : r.best;
-  applyExpression(L.profile, best ? (best.font.weight || 400) : 400);
-  if (!best) { swapFace(null); return; }
-  if (current && best.font.name !== current.name) {
-    // Hysteresis plus a short cooldown: decisive, but never flickering.
-    const cur = r.ranked.find((x) => x.font.name === current.name);
-    if (cur && best.score - cur.score < 0.02) return;
-    if (performance.now() - lastSwap < 280) { setTimeout(schedule, 300); return; }
+  if (quiet && words < 6) {
+    renderMeters(L.profile, [], L.predicted?.dim, L.valence, null);
+    applyExpression(L.profile, 400); swapFace(null); return;
   }
-  swapFace(best.font, setting(full, best.font));
+  const { pick, font } = choose(text, L, full);
+  if (pick) lastPick = pick;
+  renderMeters(L.profile, hotOf(L.profile), L.predicted?.dim, L.valence, pick);
+  applyExpression(L.profile, pick?.level === 'strong' ? 450 : 400);
+  if (current && font.name !== current.name && performance.now() - lastSwap < 260) { setTimeout(schedule, 280); return; }
+  swapFace(font);
 }
 function schedule() { if (!frame) frame = requestAnimationFrame(live); }
 
@@ -202,7 +235,8 @@ async function settle() {
   if ((text.match(/[A-Za-z']+/g) || []).length < 3) { status('write a sentence first'); return; }
   const id = ++readId;
   const a = analyze(text);
-  show(fromRules(a, ''), text);             // instant
+  const L = lean(text);
+  show(fromLive(text, a, L), text);         // instant, and the same face you were watching
   if (!WORKER_URL) return;
   status('read by rules · claude is refining…');
   try {
@@ -216,6 +250,29 @@ async function settle() {
   }
 }
 
+function fromLive(text, a, L) {
+  const { pick, font } = choose(text, L, a);
+  if (!pick) return fromRules(a, '');
+  const label = (k) => lower(DIMENSIONS.find((d) => d.id === k)?.label || k);
+  const evidence = [];
+  for (const d of DIMENSIONS) for (const w of new Set(a.hits[d.id])) evidence.push({ phrase: w, reading: label(d.id) });
+  evidence.sort((x, y) => (y.reading === label(pick.dim)) - (x.reading === label(pick.dim)));
+  const pct = Math.round(pick.value * 100);
+  const reasoning = pick.dim === 'neutral'
+    ? ['No tone stood out strongly, so it chose a calm reading face.']
+    : [
+      `Strongest tone: ${label(pick.dim)} at ${pct}%, which is the ${pick.level} level${pick.second ? `, with ${label(pick.second)} underneath` : ''}.`,
+      `The ${pick.level} ${label(pick.dim)} faces are ${pick.tier.join(', ')}. This text drew ${font.name}.`,
+      L.valence < -0.2 ? 'The mood runs dark, so bright faces were kept out.' : L.valence > 0.2 ? 'The mood runs bright.' : '',
+    ].filter(Boolean);
+  return {
+    source: 'rules', font, intent: INTENT_LABEL[a.intent], voice: null, tone: L.profile, valence: L.valence,
+    evidence, reasoning, pick,
+    alternates: pick.others.slice(0, 2).map((n) => ({ name: n, why: `also ${pick.level} ${label(pick.dim)}; another text might draw it.` })),
+    setting: { ...setting(a, font), why: { short: 'short copy: large, tight leading.', medium: 'medium copy: comfortable reading size.', long: 'long copy: smaller, looser leading for stamina.' }[a.lengthClass] },
+  };
+}
+
 function show(v, text) {
   loadFont(v.font); // applied at once; the browser swaps the glyphs in when the file lands
   swapId++; pending = null; input.classList.remove('swap');
@@ -223,7 +280,8 @@ function show(v, text) {
   applyFace(v.font, v.setting);
   applyExpression(v.tone, v.setting.weight);
   applyField(v.tone);
-  renderMeters(v.tone, hotOf(v.tone), null, v.valence);
+  if (v.pick) lastPick = v.pick;
+  renderMeters(v.tone, hotOf(v.tone), null, v.valence, v.pick);
   grow();
   const ev = v.source === 'rules' ? v.evidence.slice(0, 6) : v.evidence;
   renderMirror(text, ev);
@@ -304,7 +362,7 @@ function renderNotes(v, ev) {
     <section><h3>why</h3>${v.reasoning.map((p) => `<p>${esc(p)}</p>`).join('')}</section>
     ${v.alternates.length ? `<section><h3>also considered</h3><ul>${v.alternates.map((x) => `<li>${esc(x.name)} <span class="r">— ${esc(x.why)}</span></li>`).join('')}</ul></section>` : ''}
     <section><h3>suggested setting</h3><dl><dt>size</dt><dd>${s.size}px</dd><dt>leading</dt><dd>${s.leading}</dd><dt>measure</dt><dd>${s.measure}ch</dd><dt>weight</dt><dd>${s.weight}</dd></dl><p class="r" style="margin-top:6px">${esc(lower(s.why))}</p></section>
-    <section><p class="r">${v.source === 'ai' ? `claude${v.model ? ` (${esc(v.model)})` : ''} chose from ${POOL.length} typefaces.` : `offline rules · ${FONTS.length} hand-scored faces.`}</p></section>`;
+    <section><p class="r">${v.source === 'ai' ? `claude${v.model ? ` (${esc(v.model)})` : ''} chose from ${POOL.length} typefaces.` : `live reading · curated tiers across ${POOL.length || 79} faces.`}</p></section>`;
 }
 
 // ---------------------------------------------------------------- modes, keys, status
@@ -327,7 +385,10 @@ input.addEventListener('keydown', (e) => {
 
 // Warm the offline faces so live swaps are instant.
 const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));
-idle(() => FONTS.forEach((f, i) => setTimeout(() => loadFont(f), i * 60)));
+idle(() => poolReady.then(() => {
+  const names = [...new Set(Object.values(TIERS).flatMap((t) => Object.values(t).flat()))];
+  names.map(byName).filter(Boolean).forEach((f, i) => setTimeout(() => loadFont(f), i * 70));
+}));
 
 // Start: restore a draft if there is one, otherwise an empty, listening screen.
 {
@@ -335,7 +396,7 @@ idle(() => FONTS.forEach((f, i) => setTimeout(() => loadFont(f), i * 60)));
   try { draft = localStorage.getItem('reactive-draft') || ''; } catch {}
   input.value = draft;
   setMode('write');
-  applyField(null); renderMeters({});
+  applyField(null); buildMeters(); renderMeters({});
   live();
   input.focus();
 }
